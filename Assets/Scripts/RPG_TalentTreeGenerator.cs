@@ -3,16 +3,29 @@ using UnityEngine;
 using UnityEngine.UIElements;
 
 [RequireComponent(typeof(UIDocument))]
-public class TalentTreeGenerator : MonoBehaviour
+public class RPG_TalentTreeGenerator : MonoBehaviour
 {
-    public TalentTreeData treeData;
+    public RPG_TalentTreeData treeData;
     public Color lockedColor = Color.gray;
     public Color unlockedColor = Color.green;
 
     VisualElement root;
     VisualElement container;
-    Dictionary<TalentNodeData, VisualElement> nodeElements = new Dictionary<TalentNodeData, VisualElement>();
-    HashSet<TalentNodeData> unlocked = new HashSet<TalentNodeData>();
+    Dictionary<RPG_TalentNodeData, VisualElement> nodeElements = new Dictionary<RPG_TalentNodeData, VisualElement>();
+    HashSet<RPG_TalentNodeData> unlocked = new HashSet<RPG_TalentNodeData>();
+
+    public RPG_Basic_Stats CalculateTotalStats()
+    {
+        var total = new RPG_Basic_Stats();
+        foreach (var node in unlocked)
+        {
+            if (node.stats != null)
+            {
+                total += node.stats;
+            }
+        }
+        return total;
+    }
 
     bool isPanning;
     Vector2 lastMouse;
@@ -73,7 +86,7 @@ public class TalentTreeGenerator : MonoBehaviour
         }
     }
 
-    void PositionNode(VisualElement el, TalentNodeData data)
+    void PositionNode(VisualElement el, RPG_TalentNodeData data)
     {
         float radius = data.ringIndex * treeData.ringSpacing;
         float rad = data.angle * Mathf.Deg2Rad;
@@ -81,7 +94,7 @@ public class TalentTreeGenerator : MonoBehaviour
         el.style.top = container.layout.height / 2 + radius * Mathf.Sin(rad) - el.layout.height / 2;
     }
 
-    void OnNodeClick(TalentNodeData node)
+    void OnNodeClick(RPG_TalentNodeData node)
     {
         if (unlocked.Contains(node)) return;
         foreach (var pre in node.prerequisites)
@@ -90,11 +103,12 @@ public class TalentTreeGenerator : MonoBehaviour
         }
         unlocked.Add(node);
         UpdateNodeStyle(nodeElements[node]);
+        Debug.Log("Total Stats: " + CalculateTotalStats());
     }
 
     void UpdateNodeStyle(VisualElement el)
     {
-        var data = (TalentNodeData)el.userData;
+        var data = (RPG_TalentNodeData)el.userData;
         bool isUnlocked = unlocked.Contains(data);
         el.style.backgroundColor = isUnlocked ? new StyleColor(unlockedColor) : new StyleColor(lockedColor);
     }

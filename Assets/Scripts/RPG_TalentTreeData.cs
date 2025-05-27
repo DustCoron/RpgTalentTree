@@ -2,8 +2,8 @@ using UnityEngine;
 using System.Collections.Generic;
 
 [CreateAssetMenu(menuName = "TalentTree/Talent Tree")]
-public class TalentTreeData : ScriptableObject
+public class RPG_TalentTreeData : ScriptableObject
 {
-    public List<TalentNodeData> nodes = new List<TalentNodeData>();
+    public List<RPG_TalentNodeData> nodes = new List<RPG_TalentNodeData>();
     public float ringSpacing = 100f;
 }
