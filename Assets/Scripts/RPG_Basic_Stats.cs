@@ -11,6 +11,7 @@ public class RPG_Basic_Stats
     public int armour;
     public int evasion;
     public RPG_EnergyShieldStats energyShield = new RPG_EnergyShieldStats();
+    public RPG_ResistanceStats resistances = new RPG_ResistanceStats();
 
     public static RPG_Basic_Stats operator +(RPG_Basic_Stats a, RPG_Basic_Stats b)
     {
@@ -33,6 +34,7 @@ public class RPG_Basic_Stats
         result.energyShield.regeneration = a.energyShield.regeneration + b.energyShield.regeneration;
         result.energyShield.rechargeRate = a.energyShield.rechargeRate + b.energyShield.rechargeRate;
         result.energyShield.rechargeDelay = Mathf.Max(a.energyShield.rechargeDelay, b.energyShield.rechargeDelay);
+        result.resistances = a.resistances + b.resistances;
         return result;
     }
 
@@ -40,6 +42,6 @@ public class RPG_Basic_Stats
     {
         return $"STR:{strength} DEX:{dexterity} INT:{intelligence} " +
                $"{life} {mana} Armour:{armour} " +
-               $"Evasion:{evasion} {energyShield}";
+               $"Evasion:{evasion} {energyShield} {resistances}";
     }
 }
