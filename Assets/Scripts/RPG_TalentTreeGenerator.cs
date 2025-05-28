@@ -8,20 +8,28 @@ public class RPG_TalentTreeGenerator : MonoBehaviour
     public RPG_TalentTreeData treeData;
     public Color lockedColor = Color.gray;
     public Color unlockedColor = Color.green;
+    public int availablePoints = 10;
 
     VisualElement root;
     VisualElement container;
-    Dictionary<RPG_TalentNodeData, VisualElement> nodeElements = new Dictionary<RPG_TalentNodeData, VisualElement>();
-    HashSet<RPG_TalentNodeData> unlocked = new HashSet<RPG_TalentNodeData>();
+    class NodeInstance
+    {
+        public RPG_TalentNodeData data;
+        public int index;
+    }
+
+    List<NodeInstance> instances = new List<NodeInstance>();
+    Dictionary<NodeInstance, VisualElement> nodeElements = new Dictionary<NodeInstance, VisualElement>();
+    HashSet<NodeInstance> unlocked = new HashSet<NodeInstance>();
 
     public RPG_Basic_Stats CalculateTotalStats()
     {
         var total = new RPG_Basic_Stats();
-        foreach (var node in unlocked)
+        foreach (var inst in unlocked)
         {
-            if (node.stats != null)
+            if (inst.data.stats != null)
             {
-                total += node.stats;
+                total += inst.data.stats;
             }
         }
         return total;
@@ -55,30 +63,40 @@ public class RPG_TalentTreeGenerator : MonoBehaviour
     void GenerateTree()
     {
         if (treeData == null) return;
-        foreach (var node in treeData.nodes)
+        int id = 0;
+        foreach (var data in treeData.nodes)
         {
-            var el = new Button();
-            el.text = ""; // Could show icon/text
-            el.userData = node;
-            el.style.position = Position.Absolute;
-            el.style.width = 32;
-            el.style.height = 32;
-            el.tooltip = $"{node.nodeName}\n{node.description}";
-            UpdateNodeStyle(el);
-            PositionNode(el, node);
-            el.RegisterCallback<ClickEvent>(evt => OnNodeClick(node));
-            nodeElements[node] = el;
-            container.Add(el);
+            int count = Mathf.Max(1, data.repeatCount);
+            for (int i = 0; i < count; i++)
+            {
+                var inst = new NodeInstance { data = data, index = id++ };
+                instances.Add(inst);
+                var el = new Button();
+                el.text = string.Empty;
+                el.userData = inst;
+                el.style.position = Position.Absolute;
+                el.style.width = 32;
+                el.style.height = 32;
+                el.tooltip = $"{data.nodeName}\n{data.description}";
+                UpdateNodeStyle(el);
+                float angle = data.angle + i * data.repeatSpacing;
+                PositionNode(el, data.ringIndex, angle);
+                el.RegisterCallback<ClickEvent>(evt => OnNodeClick(inst));
+                nodeElements[inst] = el;
+                container.Add(el);
+            }
         }
         // connections
         foreach (var kv in nodeElements)
         {
-            var node = kv.Key;
-            foreach (var prereq in node.prerequisites)
+            var inst = kv.Key;
+            foreach (var prereq in inst.data.prerequisites)
             {
-                if (nodeElements.ContainsKey(prereq))
+                // connect to first instance of prerequisite
+                var target = instances.Find(n => n.data == prereq);
+                if (target != null && nodeElements.ContainsKey(target))
                 {
-                    var line = new ConnectionLine(nodeElements[prereq], kv.Value);
+                    var line = new ConnectionLine(nodeElements[target], kv.Value);
                     container.Add(line);
                     line.SendToBack();
                 }
@@ -86,30 +104,33 @@ public class RPG_TalentTreeGenerator : MonoBehaviour
         }
     }
 
-    void PositionNode(VisualElement el, RPG_TalentNodeData data)
+    void PositionNode(VisualElement el, int ringIndex, float angle)
     {
-        float radius = data.ringIndex * treeData.ringSpacing;
-        float rad = data.angle * Mathf.Deg2Rad;
+        float radius = ringIndex * treeData.ringSpacing;
+        float rad = angle * Mathf.Deg2Rad;
         el.style.left = container.layout.width / 2 + radius * Mathf.Cos(rad) - el.layout.width / 2;
         el.style.top = container.layout.height / 2 + radius * Mathf.Sin(rad) - el.layout.height / 2;
     }
 
-    void OnNodeClick(RPG_TalentNodeData node)
+    void OnNodeClick(NodeInstance inst)
     {
-        if (unlocked.Contains(node)) return;
-        foreach (var pre in node.prerequisites)
+        if (unlocked.Contains(inst)) return;
+        foreach (var pre in inst.data.prerequisites)
         {
-            if (!unlocked.Contains(pre)) return;
+            var req = instances.Find(n => n.data == pre);
+            if (req != null && !unlocked.Contains(req)) return;
         }
-        unlocked.Add(node);
-        UpdateNodeStyle(nodeElements[node]);
-        Debug.Log("Total Stats: " + CalculateTotalStats());
+        if (inst.data.cost > availablePoints) return;
+        availablePoints -= inst.data.cost;
+        unlocked.Add(inst);
+        UpdateNodeStyle(nodeElements[inst]);
+        Debug.Log($"Points left: {availablePoints} Total Stats: {CalculateTotalStats()}");
     }
 
     void UpdateNodeStyle(VisualElement el)
     {
-        var data = (RPG_TalentNodeData)el.userData;
-        bool isUnlocked = unlocked.Contains(data);
+        var inst = (NodeInstance)el.userData;
+        bool isUnlocked = unlocked.Contains(inst);
         el.style.backgroundColor = isUnlocked ? new StyleColor(unlockedColor) : new StyleColor(lockedColor);
     }
 

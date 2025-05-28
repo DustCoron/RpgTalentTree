@@ -1,0 +1,16 @@
+# Unity generated files
+[Ll]ibrary/
+[Ll]ogs/
+[Tt]emp/
+[Bb]uild/
+[Bb]uilds/
+Assets/AssetStoreTools*
+# Visual Studio
+.vs/
+*.csproj
+*.unityproj
+*.sln
+*.user
+*.userprefs
+# Misc
+.DS_Store
