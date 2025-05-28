@@ -1,0 +1,12 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns="UnityEngine.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/UI/TalentTreeStyle.uss?fileID=7433441132597879392&amp;guid=e07c5fdb7b8f48440b9a778b64acbf8e&amp;type=3#TalentTreeStyle" />
+    <ui:VisualElement name="TalentTreeRoot" class="talent-tree-root">
+        <ui:VisualElement name="ConnectionsContainer" class="connections-container" />
+        <ui:VisualElement name="NodesContainer" class="nodes-container" />
+    </ui:VisualElement>
+    <ui:VisualElement name="Container" style="flex-grow: 1;">
+        <ui:Label text="Talent Tree" name="TalentTree" class="header" />
+        <ui:Button text="Points Left" name="PointsLeft" class="button" />
+        <ui:Button text="Button" name="TalentNode" data-source="project://database/Assets/UI/TalentNode.uxml?fileID=9197481963319205126&amp;guid=014e4350c93cf3a4ca164a0589599f30&amp;type=3#TalentNode" data-source-path="inlineSheet.dimensions" class="talentnode" style="top: 320px; left: 680px;" />
+    </ui:VisualElement>
+</ui:UXML>

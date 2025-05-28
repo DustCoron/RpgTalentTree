@@ -1,0 +1,43 @@
+.header {
+    font-size: 40px;
+    color: rgb(249, 236, 27);
+    -unity-font-definition: url("project://database/Assets/UI%20Toolkit/UnityThemes/UnityDefaultRuntimeTheme.tss?fileID=2230732570650464555&guid=5a0053bfc8105f746a2491f929076419&type=3#NotInter-Regular");
+    -unity-font-style: normal;
+    -unity-text-align: upper-center;
+}
+
+.button {
+    width: 200px;
+    height: 80px;
+    -unity-text-align: middle-center;
+    font-size: 20px;
+    opacity: 1;
+}
+
+.talentnode {
+    width: 80px;
+    height: 80px;
+    border-top-width: 4px;
+    border-right-width: 4px;
+    border-bottom-width: 4px;
+    border-left-width: 4px;
+    border-top-left-radius: 45px;
+    border-top-right-radius: 45px;
+    border-bottom-right-radius: 45px;
+    border-bottom-left-radius: 45px;
+    font-size: 20px;
+    color: rgb(255, 245, 0);
+    background-color: rgb(0, 0, 0);
+    background-image: none;
+    -unity-text-outline-width: 5px;
+    -unity-text-outline-color: rgba(202, 132, 45, 0);
+    border-left-color: rgba(255, 246, 0, 0);
+    border-right-color: rgba(255, 246, 0, 0);
+    border-top-color: rgba(255, 246, 0, 0);
+    border-bottom-color: rgba(255, 246, 0, 0);
+    opacity: 1;
+    display: flex;
+    visibility: visible;
+    overflow: visible;
+    position: absolute;
+}
