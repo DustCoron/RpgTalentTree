@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns="UnityEngine.UIElements">
+  <ui:VisualElement name="TalentTreeRoot" class="talent-tree-root">
+    <ui:VisualElement name="ConnectionsContainer" class="connections-container"/>
+    <ui:VisualElement name="NodesContainer" class="nodes-container"/>
+  </ui:VisualElement>
+</ui:UXML> 

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns="UnityEngine.UIElements">
+  <ui:Button name="TalentNode" class="talent-node">
+    <ui:Image name="Icon" class="talent-node-icon"/>
+    <ui:Label name="NodeName" class="talent-node-name"/>
+  </ui:Button>
+</ui:UXML> 

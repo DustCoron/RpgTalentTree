@@ -1,0 +1,72 @@
+.talent-tree-root {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    background-color: #181818;
+}
+
+.connections-container {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+}
+
+.nodes-container {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+.talent-node {
+    width: 48px;
+    height: 48px;
+    border-radius: 24px;
+    border-width: 2px;
+    border-color: #444;
+    background-color: #333;
+    transition: background-color 0.2s, border-color 0.2s;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    box-shadow: 0 2px 8px #0008;
+}
+
+.talent-node:hover {
+    border-color: #fff;
+    background-color: #555;
+}
+
+.talent-node.locked {
+    background-color: #444;
+    border-color: #888;
+    opacity: 0.7;
+}
+
+.talent-node.unlocked {
+    background-color: #2ecc40;
+    border-color: #27ae60;
+    opacity: 1.0;
+}
+
+.talent-node.selected {
+    border-color: #ffd700;
+    box-shadow: 0 0 16px #ffd70088;
+}
+
+.talent-node-icon {
+    width: 32px;
+    height: 32px;
+    margin: 0 auto;
+}
+
+.talent-node-name {
+    color: #fff;
+    font-size: 12px;
+    text-align: center;
+    margin-top: 2px;
+    text-shadow: 0 1px 2px #000a;
+} 

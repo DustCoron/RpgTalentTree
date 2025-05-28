@@ -6,13 +6,15 @@ using UnityEngine.UIElements;
 public class RPG_TalentTreeGenerator : MonoBehaviour
 {
     public RPG_TalentTreeData treeData;
-    public Color lockedColor = Color.gray;
-    public Color unlockedColor = Color.green;
+    public VisualTreeAsset treeUXML;
+    public VisualTreeAsset nodeUXML;
+    public StyleSheet treeUSS;
 
     VisualElement root;
-    VisualElement container;
-    Dictionary<RPG_TalentNodeData, VisualElement> nodeElements = new Dictionary<RPG_TalentNodeData, VisualElement>();
-    HashSet<RPG_TalentNodeData> unlocked = new HashSet<RPG_TalentNodeData>();
+    VisualElement nodesContainer;
+    VisualElement connectionsContainer;
+    Dictionary<RPG_TalentNodeData, VisualElement> nodeElements = new();
+    HashSet<RPG_TalentNodeData> unlocked = new();
 
     public RPG_Basic_Stats CalculateTotalStats()
     {
@@ -20,9 +22,7 @@ public class RPG_TalentTreeGenerator : MonoBehaviour
         foreach (var node in unlocked)
         {
             if (node.stats != null)
-            {
                 total += node.stats;
-            }
         }
         return total;
     }
@@ -36,39 +36,47 @@ public class RPG_TalentTreeGenerator : MonoBehaviour
     {
         var doc = GetComponent<UIDocument>();
         root = doc.rootVisualElement;
-        container = new VisualElement();
-        container.style.position = Position.Absolute;
-        container.style.left = 0;
-        container.style.top = 0;
-        container.style.width = Length.Percent(100);
-        container.style.height = Length.Percent(100);
-        root.Add(container);
-
+        root.Clear();
+        if (treeUSS != null) root.styleSheets.Add(treeUSS);
+        if (treeUXML != null)
+        {
+            var tree = treeUXML.CloneTree();
+            root.Add(tree);
+            nodesContainer = tree.Q<VisualElement>("NodesContainer");
+            connectionsContainer = tree.Q<VisualElement>("ConnectionsContainer");
+        }
+        else
+        {
+            nodesContainer = new VisualElement();
+            connectionsContainer = new VisualElement();
+            root.Add(connectionsContainer);
+            root.Add(nodesContainer);
+        }
         root.RegisterCallback<WheelEvent>(OnWheel);
         root.RegisterCallback<MouseDownEvent>(OnMouseDown);
         root.RegisterCallback<MouseMoveEvent>(OnMouseMove);
         root.RegisterCallback<MouseUpEvent>(OnMouseUp);
-
         GenerateTree();
     }
 
     void GenerateTree()
     {
-        if (treeData == null) return;
+        if (treeData == null || nodeUXML == null) return;
         foreach (var node in treeData.nodes)
         {
-            var el = new Button();
-            el.text = ""; // Could show icon/text
+            var el = nodeUXML.CloneTree().Q<Button>("TalentNode");
             el.userData = node;
-            el.style.position = Position.Absolute;
-            el.style.width = 32;
-            el.style.height = 32;
             el.tooltip = $"{node.nodeName}\n{node.description}";
+            el.AddToClassList("talent-node");
+            el.Q<Label>("NodeName").text = node.nodeName;
+            // Optionally set icon here: el.Q<Image>("Icon").image = ...
             UpdateNodeStyle(el);
             PositionNode(el, node);
             el.RegisterCallback<ClickEvent>(evt => OnNodeClick(node));
+            el.RegisterCallback<MouseEnterEvent>(evt => OnNodeHover(el, node, true));
+            el.RegisterCallback<MouseLeaveEvent>(evt => OnNodeHover(el, node, false));
             nodeElements[node] = el;
-            container.Add(el);
+            nodesContainer.Add(el);
         }
         // connections
         foreach (var kv in nodeElements)
@@ -79,7 +87,7 @@ public class RPG_TalentTreeGenerator : MonoBehaviour
                 if (nodeElements.ContainsKey(prereq))
                 {
                     var line = new ConnectionLine(nodeElements[prereq], kv.Value);
-                    container.Add(line);
+                    connectionsContainer.Add(line);
                     line.SendToBack();
                 }
             }
@@ -90,17 +98,16 @@ public class RPG_TalentTreeGenerator : MonoBehaviour
     {
         float radius = data.ringIndex * treeData.ringSpacing;
         float rad = data.angle * Mathf.Deg2Rad;
-        el.style.left = container.layout.width / 2 + radius * Mathf.Cos(rad) - el.layout.width / 2;
-        el.style.top = container.layout.height / 2 + radius * Mathf.Sin(rad) - el.layout.height / 2;
+        el.style.position = Position.Absolute;
+        el.style.left = Length.Percent(50) + radius * Mathf.Cos(rad) - 24; // 24 = half node size
+        el.style.top = Length.Percent(50) + radius * Mathf.Sin(rad) - 24;
     }
 
     void OnNodeClick(RPG_TalentNodeData node)
     {
         if (unlocked.Contains(node)) return;
         foreach (var pre in node.prerequisites)
-        {
             if (!unlocked.Contains(pre)) return;
-        }
         unlocked.Add(node);
         UpdateNodeStyle(nodeElements[node]);
         Debug.Log("Total Stats: " + CalculateTotalStats());
@@ -109,8 +116,17 @@ public class RPG_TalentTreeGenerator : MonoBehaviour
     void UpdateNodeStyle(VisualElement el)
     {
         var data = (RPG_TalentNodeData)el.userData;
+        el.RemoveFromClassList("locked");
+        el.RemoveFromClassList("unlocked");
         bool isUnlocked = unlocked.Contains(data);
-        el.style.backgroundColor = isUnlocked ? new StyleColor(unlockedColor) : new StyleColor(lockedColor);
+        el.AddToClassList(isUnlocked ? "unlocked" : "locked");
+    }
+
+    void OnNodeHover(VisualElement el, RPG_TalentNodeData node, bool hover)
+    {
+        if (hover) el.AddToClassList("selected");
+        else el.RemoveFromClassList("selected");
+        // Optionally show stat preview, etc.
     }
 
     void OnWheel(WheelEvent evt)
@@ -149,8 +165,10 @@ public class RPG_TalentTreeGenerator : MonoBehaviour
 
     void ApplyTransform()
     {
-        container.transform.scale = new Vector3(zoom, zoom, 1);
-        container.transform.position = new Vector3(pan.x, pan.y, 0);
+        nodesContainer.transform.scale = new Vector3(zoom, zoom, 1);
+        nodesContainer.transform.position = new Vector3(pan.x, pan.y, 0);
+        connectionsContainer.transform.scale = new Vector3(zoom, zoom, 1);
+        connectionsContainer.transform.position = new Vector3(pan.x, pan.y, 0);
     }
 
     class ConnectionLine : VisualElement
