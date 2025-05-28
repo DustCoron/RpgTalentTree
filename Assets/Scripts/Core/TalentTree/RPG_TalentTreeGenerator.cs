@@ -98,9 +98,14 @@ public class RPG_TalentTreeGenerator : MonoBehaviour
     {
         float radius = data.ringIndex * treeData.ringSpacing;
         float rad = data.angle * Mathf.Deg2Rad;
+        // Calculate center based on container size
+        float centerX = 0.5f * nodesContainer.resolvedStyle.width;
+        float centerY = 0.5f * nodesContainer.resolvedStyle.height;
+        float x = centerX + radius * Mathf.Cos(rad) - 24; // 24 = half node size
+        float y = centerY + radius * Mathf.Sin(rad) - 24;
         el.style.position = Position.Absolute;
-        el.style.left = Length.Percent(50) + radius * Mathf.Cos(rad) - 24; // 24 = half node size
-        el.style.top = Length.Percent(50) + radius * Mathf.Sin(rad) - 24;
+        el.style.left = x;
+        el.style.top = y;
     }
 
     void OnNodeClick(RPG_TalentNodeData node)
