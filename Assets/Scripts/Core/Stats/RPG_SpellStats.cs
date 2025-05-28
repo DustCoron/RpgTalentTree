@@ -8,9 +8,10 @@ public class RPG_SpellStats
     public float cooldown;
     public int manaCost;
     public float castTime;
+    public RPG_ProjectileStats projectile = new RPG_ProjectileStats();
 
     public override string ToString()
     {
-        return $"Damage:{damage} Type:{damageType} CD:{cooldown}s Mana:{manaCost} Cast:{castTime}s";
+        return $"Damage:{damage} Type:{damageType} CD:{cooldown}s Mana:{manaCost} Cast:{castTime}s {projectile}";
     }
 }

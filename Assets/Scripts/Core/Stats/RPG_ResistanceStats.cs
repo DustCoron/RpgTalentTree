@@ -31,6 +31,28 @@ public class RPG_ResistanceStats
         return damage * (1f - res / 100f);
     }
 
+    public static RPG_ResistanceStats operator -(RPG_ResistanceStats a, RPG_ResistanceStats b)
+    {
+        var result = new RPG_ResistanceStats();
+        result.fire = a.fire - b.fire;
+        result.cold = a.cold - b.cold;
+        result.lightning = a.lightning - b.lightning;
+        result.chaos = a.chaos - b.chaos;
+        result.maxResistanceBonus = a.maxResistanceBonus - b.maxResistanceBonus;
+        return result;
+    }
+
+    public static RPG_ResistanceStats operator *(RPG_ResistanceStats a, float m)
+    {
+        var result = new RPG_ResistanceStats();
+        result.fire = a.fire * m;
+        result.cold = a.cold * m;
+        result.lightning = a.lightning * m;
+        result.chaos = a.chaos * m;
+        result.maxResistanceBonus = a.maxResistanceBonus * m;
+        return result;
+    }
+
     public static RPG_ResistanceStats operator +(RPG_ResistanceStats a, RPG_ResistanceStats b)
     {
         var result = new RPG_ResistanceStats();
