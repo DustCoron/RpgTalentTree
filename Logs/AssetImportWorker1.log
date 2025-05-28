@@ -262,3 +262,80 @@ Memory consumption went from 77.6 MB to 77.6 MB.
 Total: 2.746000 ms (FindLiveObjects: 0.031900 ms CreateObjectMapping: 0.003100 ms MarkObjects: 2.699000 ms  DeleteObjects: 0.011500 ms)
 
 Prepare: number of updated asset objects reloaded= 0
+========================================================================
+Received Import Request.
+  Time since last request: 7371.744585 seconds.
+  path: Assets/UI/TalentTreeStyle.uss
+  artifactKey: Guid(e07c5fdb7b8f48440b9a778b64acbf8e) Importer(815301076,1909f56bfc062723c751e8b465ee728b)
+Start importing Assets/UI/TalentTreeStyle.uss using Guid(e07c5fdb7b8f48440b9a778b64acbf8e) Importer(815301076,1909f56bfc062723c751e8b465ee728b) (PreviewImporter)[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+ -> (artifact id: 'cabdf846a250a5b52dd178e9c967eb1c') in 0.0274884 seconds
+Number of updated asset objects reloaded before import = 0Number of asset objects unloaded after import = 3
+
+========================================================================
+Received Import Request.
+  Time since last request: 1239.339216 seconds.
+  path: Assets/UI/UI_TalentTree.uxml
+  artifactKey: Guid(2de99f60375513141904f9b69a9ffd89) Importer(815301076,1909f56bfc062723c751e8b465ee728b)
+Start importing Assets/UI/UI_TalentTree.uxml using Guid(2de99f60375513141904f9b69a9ffd89) Importer(815301076,1909f56bfc062723c751e8b465ee728b) (PreviewImporter)[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+ -> (artifact id: 'dff27d41d08f920bcc2bbb68a09a9aa9') in 0.0321661 seconds
+Number of updated asset objects reloaded before import = 0Number of asset objects unloaded after import = 7
+
+========================================================================
+Received Import Request.
+  Time since last request: 1805.248255 seconds.
+  path: Assets/UI/TalentTreeStyle.uss
+  artifactKey: Guid(e07c5fdb7b8f48440b9a778b64acbf8e) Importer(815301076,1909f56bfc062723c751e8b465ee728b)
+Start importing Assets/UI/TalentTreeStyle.uss using Guid(e07c5fdb7b8f48440b9a778b64acbf8e) Importer(815301076,1909f56bfc062723c751e8b465ee728b) (PreviewImporter)[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+ -> (artifact id: 'fe3bae4b3feb1a796617d2ddb75d237d') in 0.0026428 seconds
+Number of updated asset objects reloaded before import = 0Number of asset objects unloaded after import = 3
+
+========================================================================
+Received Prepare
+Begin MonoManager ReloadAssembly
+- Loaded All Assemblies, in  0.250 seconds
+Refreshing native plugins compatible for Editor in 0.00 ms, found 0 plugins.
+Assertion failed on expression: 'pred(*previous, *i)'
+Assertion failed on expression: 'pred(*previous, *i)'
+Native extension for WindowsStandalone target not found
+Mono: successfully reloaded assembly
+- Finished resetting the current domain, in  0.376 seconds
+Domain Reload Profiling: 625ms
+	BeginReloadAssembly (184ms)
+		ExecutionOrderSort (0ms)
+		DisableScriptedObjects (9ms)
+		BackupInstance (0ms)
+		ReleaseScriptingObjects (0ms)
+		CreateAndSetChildDomain (44ms)
+	RebuildCommonClasses (30ms)
+	RebuildNativeTypeToScriptingClass (11ms)
+	initialDomainReloadingComplete (15ms)
+	LoadAllAssembliesAndSetupDomain (9ms)
+		LoadAssemblies (100ms)
+		RebuildTransferFunctionScriptingTraits (0ms)
+		AnalyzeDomain (6ms)
+			TypeCache.Refresh (4ms)
+				TypeCache.ScanAssembly (0ms)
+			BuildScriptInfoCaches (0ms)
+			ResolveRequiredComponents (0ms)
+	FinalizeReload (376ms)
+		ReleaseScriptCaches (0ms)
+		RebuildScriptCaches (0ms)
+		SetupLoadedEditorAssemblies (230ms)
+			LogAssemblyErrors (0ms)
+			InitializePlatformSupportModulesInManaged (2ms)
+			SetLoadedEditorAssemblies (4ms)
+			BeforeProcessingInitializeOnLoad (7ms)
+			ProcessInitializeOnLoadAttributes (90ms)
+			ProcessInitializeOnLoadMethodAttributes (124ms)
+			AfterProcessingInitializeOnLoad (3ms)
+			EditorAssembliesLoaded (0ms)
+		ExecutionOrderSort2 (0ms)
+		AwakeInstancesAfterBackupRestoration (6ms)
+Refreshing native plugins compatible for Editor in 0.00 ms, found 0 plugins.
+Preloading 0 native plugins for Editor in 0.00 ms.
+Unloading 0 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 14 unused Assets / (0 B). Loaded Objects now: 613.
+Memory consumption went from 77.6 MB to 77.6 MB.
+Total: 3.255400 ms (FindLiveObjects: 0.026400 ms CreateObjectMapping: 0.003300 ms MarkObjects: 3.193700 ms  DeleteObjects: 0.031000 ms)
+
+Prepare: number of updated asset objects reloaded= 0

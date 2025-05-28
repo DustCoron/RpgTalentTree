@@ -379,3 +379,192 @@ Memory consumption went from 77.5 MB to 77.5 MB.
 Total: 3.120500 ms (FindLiveObjects: 0.024100 ms CreateObjectMapping: 0.003000 ms MarkObjects: 3.079500 ms  DeleteObjects: 0.013400 ms)
 
 Prepare: number of updated asset objects reloaded= 0
+========================================================================
+Received Import Request.
+  Time since last request: 2278.397186 seconds.
+  path: Assets/UI/UIDocument.prefab
+  artifactKey: Guid(71da2323338c1f04492fefa06887949a) Importer(815301076,1909f56bfc062723c751e8b465ee728b)
+Start importing Assets/UI/UIDocument.prefab using Guid(71da2323338c1f04492fefa06887949a) Importer(815301076,1909f56bfc062723c751e8b465ee728b) (PreviewImporter)[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+ -> (artifact id: 'fd35b0d80b27ef17e005754743d18d38') in 0.0521164 seconds
+Number of updated asset objects reloaded before import = 0Number of asset objects unloaded after import = 31
+
+========================================================================
+Received Import Request.
+  Time since last request: 98.235626 seconds.
+  path: Assets/UI Toolkit/PanelSettings.asset
+  artifactKey: Guid(28bca1d44bb564740ab89c4862b9b796) Importer(815301076,1909f56bfc062723c751e8b465ee728b)
+Start importing Assets/UI Toolkit/PanelSettings.asset using Guid(28bca1d44bb564740ab89c4862b9b796) Importer(815301076,1909f56bfc062723c751e8b465ee728b) (PreviewImporter)[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+ -> (artifact id: '3e1133744ef8fd34060c8c9bf70f9e90') in 0.0087796 seconds
+Number of updated asset objects reloaded before import = 0Number of asset objects unloaded after import = 26
+
+========================================================================
+Received Import Request.
+  Time since last request: 242.108186 seconds.
+  path: Assets/UI/TalentTree.uss
+  artifactKey: Guid(e07c5fdb7b8f48440b9a778b64acbf8e) Importer(815301076,1909f56bfc062723c751e8b465ee728b)
+Start importing Assets/UI/TalentTree.uss using Guid(e07c5fdb7b8f48440b9a778b64acbf8e) Importer(815301076,1909f56bfc062723c751e8b465ee728b) (PreviewImporter)[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+ -> (artifact id: '53c17d28e8e9c63485eef7e940e79909') in 0.0016115 seconds
+Number of updated asset objects reloaded before import = 0Number of asset objects unloaded after import = 1
+
+========================================================================
+Received Import Request.
+  Time since last request: 148.403470 seconds.
+  path: Assets/UI Toolkit/UnityThemes/UnityDefaultRuntimeTheme.tss
+  artifactKey: Guid(5a0053bfc8105f746a2491f929076419) Importer(815301076,1909f56bfc062723c751e8b465ee728b)
+Start importing Assets/UI Toolkit/UnityThemes/UnityDefaultRuntimeTheme.tss using Guid(5a0053bfc8105f746a2491f929076419) Importer(815301076,1909f56bfc062723c751e8b465ee728b) (PreviewImporter)[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+ -> (artifact id: '46fb122743039875686e26ef714a4b75') in 0.1331999 seconds
+Number of updated asset objects reloaded before import = 0Number of asset objects unloaded after import = 26
+
+========================================================================
+Received Import Request.
+  Time since last request: 99.751717 seconds.
+  path: Assets/UI/TalentTree.uss
+  artifactKey: Guid(e07c5fdb7b8f48440b9a778b64acbf8e) Importer(815301076,1909f56bfc062723c751e8b465ee728b)
+Start importing Assets/UI/TalentTree.uss using Guid(e07c5fdb7b8f48440b9a778b64acbf8e) Importer(815301076,1909f56bfc062723c751e8b465ee728b) (PreviewImporter)[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+ -> (artifact id: '89eecc537ddf5b14234b180746751a7d') in 0.0022793 seconds
+Number of updated asset objects reloaded before import = 0Number of asset objects unloaded after import = 3
+
+========================================================================
+Received Import Request.
+  Time since last request: 60.422717 seconds.
+  path: Assets/UI/TalentTree.uxml
+  artifactKey: Guid(2de99f60375513141904f9b69a9ffd89) Importer(815301076,1909f56bfc062723c751e8b465ee728b)
+Start importing Assets/UI/TalentTree.uxml using Guid(2de99f60375513141904f9b69a9ffd89) Importer(815301076,1909f56bfc062723c751e8b465ee728b) (PreviewImporter)[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+ -> (artifact id: '5e2002fafb228e6e6c7a4d71d49693f9') in 0.02346 seconds
+Number of updated asset objects reloaded before import = 0Number of asset objects unloaded after import = 5
+
+========================================================================
+Received Import Request.
+  Time since last request: 554.007042 seconds.
+  path: Assets/UI/TalentTree.uxml
+  artifactKey: Guid(2de99f60375513141904f9b69a9ffd89) Importer(815301076,1909f56bfc062723c751e8b465ee728b)
+Start importing Assets/UI/TalentTree.uxml using Guid(2de99f60375513141904f9b69a9ffd89) Importer(815301076,1909f56bfc062723c751e8b465ee728b) (PreviewImporter)[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+ -> (artifact id: '9dc2810354510bd7a09f400f04aa839a') in 0.0024861 seconds
+Number of updated asset objects reloaded before import = 0Number of asset objects unloaded after import = 5
+
+========================================================================
+Received Import Request.
+  Time since last request: 7.559237 seconds.
+  path: Assets/UI/UI_TalentTree.uxml
+  artifactKey: Guid(2de99f60375513141904f9b69a9ffd89) Importer(815301076,1909f56bfc062723c751e8b465ee728b)
+Start importing Assets/UI/UI_TalentTree.uxml using Guid(2de99f60375513141904f9b69a9ffd89) Importer(815301076,1909f56bfc062723c751e8b465ee728b) (PreviewImporter)[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+ -> (artifact id: 'ad137b304cd4e4dfcf1d9affdae3b471') in 0.0018334 seconds
+Number of updated asset objects reloaded before import = 0Number of asset objects unloaded after import = 5
+
+========================================================================
+Received Import Request.
+  Time since last request: 1231.802632 seconds.
+  path: Assets/UI/TalentTreeStyle.uss
+  artifactKey: Guid(e07c5fdb7b8f48440b9a778b64acbf8e) Importer(815301076,1909f56bfc062723c751e8b465ee728b)
+Start importing Assets/UI/TalentTreeStyle.uss using Guid(e07c5fdb7b8f48440b9a778b64acbf8e) Importer(815301076,1909f56bfc062723c751e8b465ee728b) (PreviewImporter)[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+ -> (artifact id: 'eed15d92ea1e7cfd390f0c1b1a35e310') in 0.0026137 seconds
+Number of updated asset objects reloaded before import = 0Number of asset objects unloaded after import = 3
+
+========================================================================
+Received Import Request.
+  Time since last request: 1387.881705 seconds.
+  path: Assets/UI/UI_TalentTree.uxml
+  artifactKey: Guid(2de99f60375513141904f9b69a9ffd89) Importer(815301076,1909f56bfc062723c751e8b465ee728b)
+Start importing Assets/UI/UI_TalentTree.uxml using Guid(2de99f60375513141904f9b69a9ffd89) Importer(815301076,1909f56bfc062723c751e8b465ee728b) (PreviewImporter)[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+ -> (artifact id: '3c80f8a22d2536c37d6591987f667f30') in 0.0066109 seconds
+Number of updated asset objects reloaded before import = 0Number of asset objects unloaded after import = 4
+
+========================================================================
+Received Import Request.
+  Time since last request: 5.379854 seconds.
+  path: Assets/UI/UI_TalentTree.uxml
+  artifactKey: Guid(2de99f60375513141904f9b69a9ffd89) Importer(815301076,1909f56bfc062723c751e8b465ee728b)
+Start importing Assets/UI/UI_TalentTree.uxml using Guid(2de99f60375513141904f9b69a9ffd89) Importer(815301076,1909f56bfc062723c751e8b465ee728b) (PreviewImporter)[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+ -> (artifact id: 'a61c67e2554ee22fd26143550ba8bcef') in 0.0011584 seconds
+Number of updated asset objects reloaded before import = 0Number of asset objects unloaded after import = 2
+
+========================================================================
+Received Import Request.
+  Time since last request: 412.007276 seconds.
+  path: Assets/UI/TalentNode.uxml
+  artifactKey: Guid(014e4350c93cf3a4ca164a0589599f30) Importer(815301076,1909f56bfc062723c751e8b465ee728b)
+Start importing Assets/UI/TalentNode.uxml using Guid(014e4350c93cf3a4ca164a0589599f30) Importer(815301076,1909f56bfc062723c751e8b465ee728b) (PreviewImporter)[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+ -> (artifact id: '4d65d32707a9d9dce064386cb0229309') in 0.0016198 seconds
+Number of updated asset objects reloaded before import = 0Number of asset objects unloaded after import = 2
+
+========================================================================
+Received Import Request.
+  Time since last request: 0.000228 seconds.
+  path: Assets/UI/UI_TalentTree.uxml
+  artifactKey: Guid(2de99f60375513141904f9b69a9ffd89) Importer(815301076,1909f56bfc062723c751e8b465ee728b)
+Start importing Assets/UI/UI_TalentTree.uxml using Guid(2de99f60375513141904f9b69a9ffd89) Importer(815301076,1909f56bfc062723c751e8b465ee728b) (PreviewImporter)[PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
+ -> (artifact id: 'c35f4a6ce79287a61a3a652e53298cac') in 0.0023935 seconds
+Number of updated asset objects reloaded before import = 0Number of asset objects unloaded after import = 7
+
+========================================================================
+Received Prepare
+Begin MonoManager ReloadAssembly
+- Loaded All Assemblies, in  0.268 seconds
+Refreshing native plugins compatible for Editor in 0.00 ms, found 0 plugins.
+Assertion failed on expression: 'pred(*previous, *i)'
+Assertion failed on expression: 'pred(*previous, *i)'
+Native extension for WindowsStandalone target not found
+Mono: successfully reloaded assembly
+- Finished resetting the current domain, in  0.376 seconds
+Domain Reload Profiling: 644ms
+	BeginReloadAssembly (202ms)
+		ExecutionOrderSort (0ms)
+		DisableScriptedObjects (12ms)
+		BackupInstance (0ms)
+		ReleaseScriptingObjects (0ms)
+		CreateAndSetChildDomain (58ms)
+	RebuildCommonClasses (33ms)
+	RebuildNativeTypeToScriptingClass (8ms)
+	initialDomainReloadingComplete (15ms)
+	LoadAllAssembliesAndSetupDomain (9ms)
+		LoadAssemblies (92ms)
+		RebuildTransferFunctionScriptingTraits (0ms)
+		AnalyzeDomain (7ms)
+			TypeCache.Refresh (3ms)
+				TypeCache.ScanAssembly (0ms)
+			BuildScriptInfoCaches (0ms)
+			ResolveRequiredComponents (1ms)
+	FinalizeReload (377ms)
+		ReleaseScriptCaches (0ms)
+		RebuildScriptCaches (0ms)
+		SetupLoadedEditorAssemblies (227ms)
+			LogAssemblyErrors (0ms)
+			InitializePlatformSupportModulesInManaged (2ms)
+			SetLoadedEditorAssemblies (4ms)
+			BeforeProcessingInitializeOnLoad (7ms)
+			ProcessInitializeOnLoadAttributes (90ms)
+			ProcessInitializeOnLoadMethodAttributes (120ms)
+			AfterProcessingInitializeOnLoad (3ms)
+			EditorAssembliesLoaded (0ms)
+		ExecutionOrderSort2 (0ms)
+		AwakeInstancesAfterBackupRestoration (6ms)
+Refreshing native plugins compatible for Editor in 0.00 ms, found 0 plugins.
+Preloading 0 native plugins for Editor in 0.00 ms.
+Unloading 0 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 16 unused Assets / (60.9 KB). Loaded Objects now: 665.
+Memory consumption went from 78.2 MB to 78.1 MB.
+Total: 3.510500 ms (FindLiveObjects: 0.028900 ms CreateObjectMapping: 0.003700 ms MarkObjects: 3.394000 ms  DeleteObjects: 0.083200 ms)
+
+Prepare: number of updated asset objects reloaded= 0
