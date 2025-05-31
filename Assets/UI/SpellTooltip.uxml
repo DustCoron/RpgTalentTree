@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns="UnityEngine.UIElements">
+  <ui:VisualElement name="SpellTooltip" class="spell-tooltip">
+    <ui:Label name="SpellName" class="spell-tooltip-name" />
+    <ui:Label name="Damage" class="spell-tooltip-damage" />
+    <ui:Label name="Type" class="spell-tooltip-type" />
+    <ui:Label name="Cooldown" class="spell-tooltip-cooldown" />
+    <ui:Label name="ManaCost" class="spell-tooltip-manacost" />
+    <ui:Label name="CastTime" class="spell-tooltip-casttime" />
+    <ui:Label name="Projectile" class="spell-tooltip-projectile" />
+  </ui:VisualElement>
+</ui:UXML> 
