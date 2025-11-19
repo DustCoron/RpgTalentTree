@@ -328,7 +328,7 @@ public class TalentManager : MonoBehaviour
             currentLevel = currentLevel,
             availableTalentPoints = availableTalentPoints,
             spentTalentPoints = spentTalentPoints,
-            allocatedNodeNames = allocatedNodes.Select(n => n.name).ToList()
+            allocatedNodeNames = allocatedNodes.Select(n => n.nodeName).ToList()
         };
         
         string json = JsonUtility.ToJson(saveData, true);
@@ -381,7 +381,7 @@ public class TalentManager : MonoBehaviour
     {
         foreach (var tree in availableTrees)
         {
-            var node = tree.nodes.FirstOrDefault(n => n.name == nodeName);
+            var node = tree.nodes.FirstOrDefault(n => n.nodeName == nodeName);
             if (node != null) return node;
         }
         return null;

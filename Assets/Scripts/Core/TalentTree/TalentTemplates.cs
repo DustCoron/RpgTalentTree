@@ -12,6 +12,7 @@ public static class TalentTemplates
     public static RPG_TalentTreeData CreateWarriorTree()
     {
         var tree = ScriptableObject.CreateInstance<RPG_TalentTreeData>();
+        tree.name = "Warrior Combat"; // Set ScriptableObject name for Unity editor identification
         tree.treeName = "Warrior Combat";
         tree.description = "Physical damage and defense specialization";
         tree.primaryArchetype = ClassArchetype.Warrior;
@@ -61,6 +62,7 @@ public static class TalentTemplates
     public static RPG_TalentTreeData CreateMageTree()
     {
         var tree = ScriptableObject.CreateInstance<RPG_TalentTreeData>();
+        tree.name = "Arcane Arts"; // Set ScriptableObject name for Unity editor identification
         tree.treeName = "Arcane Arts";
         tree.description = "Elemental magic and spell mastery";
         tree.primaryArchetype = ClassArchetype.Mage;
@@ -114,6 +116,7 @@ public static class TalentTemplates
     public static RPG_TalentTreeData CreateNecromancerTree()
     {
         var tree = ScriptableObject.CreateInstance<RPG_TalentTreeData>();
+        tree.name = "Death Magic"; // Set ScriptableObject name for Unity editor identification
         tree.treeName = "Death Magic";
         tree.description = "Minion mastery and life manipulation";
         tree.primaryArchetype = ClassArchetype.Summoner;
@@ -159,6 +162,7 @@ public static class TalentTemplates
     public static RPG_TalentTreeData CreateUtilityTree()
     {
         var tree = ScriptableObject.CreateInstance<RPG_TalentTreeData>();
+        tree.name = "Utility Skills"; // Set ScriptableObject name for Unity editor identification
         tree.treeName = "Utility Skills";
         tree.description = "Universal skills available to all archetypes";
         tree.primaryArchetype = ClassArchetype.Warrior; // Но доступно всем через requiresAllArchetypes
@@ -190,10 +194,11 @@ public static class TalentTemplates
     /// <summary>
     /// Вспомогательный метод для создания узла таланта
     /// </summary>
-    static RPG_TalentNodeData CreateNode(string name, string description, TalentStatModifier statMod, 
+    static RPG_TalentNodeData CreateNode(string name, string description, TalentStatModifier statMod,
         int ring, float angle, TalentNodeType type, TalentCategory category, params RPG_TalentNodeData[] prerequisites)
     {
         var node = ScriptableObject.CreateInstance<RPG_TalentNodeData>();
+        node.name = name; // Set ScriptableObject name for Unity editor identification
         node.nodeName = name;
         node.description = description;
         node.ringIndex = ring;

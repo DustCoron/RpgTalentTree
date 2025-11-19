@@ -19,7 +19,7 @@ public class RPG_TalentTreeGenerator : MonoBehaviour
     public Color lockedColor = Color.gray;
     public Color availableColor = Color.white;
     public Color allocatedColor = Color.green;
-    public Color keystoneColor = Color.gold;
+    public Color keystoneColor = new Color(1f, 0.84f, 0f); // Gold color
     
     // UI Elements
     VisualElement root;
