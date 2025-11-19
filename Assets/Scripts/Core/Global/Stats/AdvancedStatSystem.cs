@@ -109,7 +109,7 @@ public class AdvancedStatSystem : MonoBehaviour
     public void RemoveModifiersFromSource(string source)
     {
         bool removedAny = false;
-        
+
         for (int i = activeModifiers.Count - 1; i >= 0; i--)
         {
             if (activeModifiers[i].source == source)
@@ -120,11 +120,25 @@ public class AdvancedStatSystem : MonoBehaviour
                 removedAny = true;
             }
         }
-        
+
         if (removedAny)
         {
             MarkStatsCacheDirty();
         }
+    }
+
+    /// <summary>
+    /// Clear all modifiers and reset base stats to default values
+    /// </summary>
+    public void ClearAllStats()
+    {
+        // Clear all modifiers
+        activeModifiers.Clear();
+
+        // Reset base stats to defaults
+        InitializeBaseStats();
+
+        MarkStatsCacheDirty();
     }
     
     public float GetStat(StatType statType)
