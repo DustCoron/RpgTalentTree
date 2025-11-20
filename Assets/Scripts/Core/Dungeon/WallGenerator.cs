@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.ProBuilder;
+using UnityEngine.ProBuilder.MeshOperations;
 
 namespace RpgTalentTree.Core.Dungeon
 {
@@ -131,6 +132,9 @@ namespace RpgTalentTree.Core.Dungeon
 
             // Create right column
             CreateColumn(parent, $"Column_{wallSide}_Right", rightColumnPos, columnWidth, columnDepth, columnHeight);
+
+            // Create decorative arch above doorway
+            CreateDoorwayArch(parent, wallSide, leftColumnPos, rightColumnPos, doorway, isHorizontal);
         }
 
         /// <summary>
@@ -197,6 +201,70 @@ namespace RpgTalentTree.Core.Dungeon
 
             pbMesh.ToMesh();
             pbMesh.Refresh();
+        }
+
+        /// <summary>
+        /// Create a decorative arch above a doorway using ProBuilder's arch generator
+        /// </summary>
+        private void CreateDoorwayArch(GameObject parent, Doorway.WallSide wallSide, Vector3 leftColumnPos, Vector3 rightColumnPos, Doorway doorway, bool isHorizontal)
+        {
+            // Calculate arch parameters
+            float doorwayWidth = Vector3.Distance(leftColumnPos, rightColumnPos);
+            float archRadius = doorwayWidth / 2f;
+            float archHeight = wallHeight * 0.7f; // Position arch at 70% of wall height
+            float archWidth = 0.3f; // Thickness of arch blocks
+            float archDepth = wallThickness + 0.1f; // Slightly thicker than wall
+
+            // Calculate center position between columns
+            Vector3 centerPos = (leftColumnPos + rightColumnPos) / 2f;
+            centerPos.y = archHeight;
+
+            // Use ProBuilder's built-in arch generator
+            ProBuilderMesh archMesh = ShapeGenerator.GenerateArch(
+                PivotLocation.Center,           // Pivot at center
+                180f,                           // Semi-circle (180 degrees)
+                archRadius,                     // Radius spans doorway width
+                archWidth,                      // Width of arch blocks
+                archDepth,                      // Depth of arch
+                5,                              // Number of radial segments
+                false,                          // No inside faces
+                true,                           // Outside faces visible
+                true,                           // Front faces visible
+                true,                           // Back faces visible
+                true                            // End caps
+            );
+
+            // Configure the arch object
+            GameObject archObject = archMesh.gameObject;
+            archObject.name = $"Arch_{wallSide}";
+            archObject.transform.SetParent(parent.transform);
+            archObject.transform.position = centerPos;
+
+            // Rotate arch to align with wall orientation
+            if (isHorizontal)
+            {
+                // For North/South walls, arch faces along Z axis
+                archObject.transform.rotation = Quaternion.Euler(0, 0, 0);
+            }
+            else
+            {
+                // For East/West walls, arch faces along X axis, rotate 90 degrees
+                archObject.transform.rotation = Quaternion.Euler(0, 90, 0);
+            }
+
+            // Apply material
+            if (wallMaterial != null)
+            {
+                var renderer = archMesh.GetComponent<MeshRenderer>();
+                if (renderer != null)
+                {
+                    renderer.sharedMaterial = wallMaterial;
+                }
+            }
+
+            // Finalize the mesh
+            archMesh.ToMesh();
+            archMesh.Refresh();
         }
 
         /// <summary>
