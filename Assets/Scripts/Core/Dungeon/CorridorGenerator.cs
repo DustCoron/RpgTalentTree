@@ -26,7 +26,7 @@ namespace RpgTalentTree.Core.Dungeon
         }
 
         /// <summary>
-        /// Create a complete corridor segment with floor, walls, and ceiling
+        /// Create a complete corridor segment with floor, walls, and ceiling as a single mesh
         /// </summary>
         public GameObject CreateCorridor(Vector3 start, Vector3 end, Transform parent, int corridorIndex, string direction)
         {
@@ -35,339 +35,209 @@ namespace RpgTalentTree.Core.Dungeon
 
             GameObject corridorObj = new GameObject($"Corridor_{corridorIndex}_{direction}");
             corridorObj.transform.SetParent(parent);
+            corridorObj.transform.position = start;
 
-            Vector3 dir = (end - start).normalized;
-            float distance = Vector3.Distance(start, end);
+            Vector3 localEnd = end - start;
+            float distance = localEnd.magnitude;
+            Vector3 dir = localEnd.normalized;
 
             // Determine corridor orientation
             bool isHorizontalX = Mathf.Abs(dir.x) > Mathf.Abs(dir.z);
 
-            // Create floor
-            CreateCorridorFloor(corridorObj, start, distance, isHorizontalX);
-
-            // Create walls
-            CreateCorridorWalls(corridorObj, start, distance, isHorizontalX);
-
-            // Create ceiling
-            CreateCorridorCeiling(corridorObj, start, distance, isHorizontalX);
+            // Create single unified mesh for entire corridor
+            CreateUnifiedCorridorMesh(corridorObj, distance, isHorizontalX);
 
             return corridorObj;
         }
 
         /// <summary>
-        /// Create a corner piece to connect two perpendicular corridor segments
+        /// Create unified corridor mesh with floor, walls, and ceiling
         /// </summary>
-        public GameObject CreateCorridorCorner(Vector3 cornerPosition, Transform parent, int corridorIndex)
+        private void CreateUnifiedCorridorMesh(GameObject parent, float distance, bool isHorizontalX)
         {
-            GameObject cornerObj = new GameObject($"CorridorCorner_{corridorIndex}");
-            cornerObj.transform.SetParent(parent);
+            GameObject meshObj = new GameObject("CorridorMesh");
+            meshObj.transform.SetParent(parent.transform);
+            meshObj.transform.localPosition = Vector3.zero;
 
             float halfWidth = corridorWidth / 2f;
+            List<Vector3> vertices = new List<Vector3>();
+            List<Face> faces = new List<Face>();
+            int vertexOffset = 0;
 
-            // Create corner floor
-            CreateCornerFloor(cornerObj, cornerPosition, halfWidth);
-
-            // Create corner ceiling
-            CreateCornerCeiling(cornerObj, cornerPosition, halfWidth);
-
-            return cornerObj;
-        }
-
-        /// <summary>
-        /// Create corridor floor
-        /// </summary>
-        private void CreateCorridorFloor(GameObject parent, Vector3 start, float distance, bool isHorizontalX)
-        {
-            GameObject floorObj = new GameObject("Floor");
-            floorObj.transform.SetParent(parent.transform);
-            floorObj.transform.position = start;
-
-            Vector3[] vertices;
-            float halfWidth = corridorWidth / 2f;
-
-            if (isHorizontalX)
-            {
-                // Horizontal corridor (along X axis)
-                vertices = new Vector3[] {
+            // Build floor
+            Vector3[] floorVerts = isHorizontalX
+                ? new Vector3[] {
                     new Vector3(0, 0, -halfWidth),
                     new Vector3(distance, 0, -halfWidth),
                     new Vector3(distance, 0, halfWidth),
                     new Vector3(0, 0, halfWidth)
-                };
-            }
-            else
-            {
-                // Vertical corridor (along Z axis)
-                vertices = new Vector3[] {
+                }
+                : new Vector3[] {
                     new Vector3(-halfWidth, 0, 0),
                     new Vector3(halfWidth, 0, 0),
                     new Vector3(halfWidth, 0, distance),
                     new Vector3(-halfWidth, 0, distance)
                 };
-            }
 
-            // Create face (counter-clockwise winding for upward-facing normals)
-            Face face = new Face(new int[] { 0, 3, 2, 0, 2, 1 });
+            vertices.AddRange(floorVerts);
+            faces.Add(new Face(new int[] { 0, 3, 2, 0, 2, 1 }));
+            vertexOffset += 4;
 
-            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices, new Face[] { face });
-            pbMesh.gameObject.transform.SetParent(floorObj.transform);
-            pbMesh.gameObject.transform.localPosition = Vector3.zero;
-            pbMesh.gameObject.name = "FloorMesh";
-
-            // Apply material
-            if (floorMaterial != null)
+            // Build ceiling
+            Vector3[] ceilingVerts = new Vector3[4];
+            for (int i = 0; i < 4; i++)
             {
-                var renderer = pbMesh.GetComponent<MeshRenderer>();
-                if (renderer != null)
-                {
-                    renderer.sharedMaterial = floorMaterial;
-                }
+                ceilingVerts[i] = floorVerts[i] + Vector3.up * wallHeight;
             }
+            vertices.AddRange(ceilingVerts);
+            faces.Add(new Face(new int[] {
+                vertexOffset + 0,
+                vertexOffset + 2,
+                vertexOffset + 1,
+                vertexOffset + 0,
+                vertexOffset + 3,
+                vertexOffset + 2
+            }));
+            vertexOffset += 4;
 
-            pbMesh.ToMesh();
-            pbMesh.Refresh();
-        }
-
-        /// <summary>
-        /// Create corridor walls
-        /// </summary>
-        private void CreateCorridorWalls(GameObject parent, Vector3 start, float distance, bool isHorizontalX)
-        {
-            float halfWidth = corridorWidth / 2f;
-
+            // Build walls (left and right)
             if (isHorizontalX)
             {
                 // Left wall (negative Z)
-                CreateCorridorWall(parent, "Wall_Left",
+                AddWallToMesh(vertices, faces, ref vertexOffset,
                     new Vector3(0, 0, -halfWidth),
                     new Vector3(distance, 0, -halfWidth),
-                    start);
+                    new Vector3(-dir.z, 0, dir.x));
 
                 // Right wall (positive Z)
-                CreateCorridorWall(parent, "Wall_Right",
+                AddWallToMesh(vertices, faces, ref vertexOffset,
                     new Vector3(0, 0, halfWidth),
                     new Vector3(distance, 0, halfWidth),
-                    start);
+                    new Vector3(-dir.z, 0, dir.x));
             }
             else
             {
                 // Left wall (negative X)
-                CreateCorridorWall(parent, "Wall_Left",
+                AddWallToMesh(vertices, faces, ref vertexOffset,
                     new Vector3(-halfWidth, 0, 0),
                     new Vector3(-halfWidth, 0, distance),
-                    start);
+                    new Vector3(-dir.z, 0, dir.x));
 
                 // Right wall (positive X)
-                CreateCorridorWall(parent, "Wall_Right",
+                AddWallToMesh(vertices, faces, ref vertexOffset,
                     new Vector3(halfWidth, 0, 0),
                     new Vector3(halfWidth, 0, distance),
-                    start);
+                    new Vector3(-dir.z, 0, dir.x));
             }
-        }
 
-        /// <summary>
-        /// Create a single corridor wall
-        /// </summary>
-        private void CreateCorridorWall(GameObject parent, string name, Vector3 localStart, Vector3 localEnd, Vector3 worldStart)
-        {
-            GameObject wallObj = new GameObject(name);
-            wallObj.transform.SetParent(parent.transform);
-            wallObj.transform.position = worldStart;
-
-            // Create wall polygon with 4 corners (a thin rectangle)
-            Vector3 direction = (localEnd - localStart).normalized;
-            Vector3 perpendicular = new Vector3(-direction.z, 0, direction.x) * this.wallThickness;
-
-            // Define base rectangle vertices
-            Vector3 v0 = localStart;
-            Vector3 v1 = localStart + perpendicular;
-            Vector3 v2 = localEnd + perpendicular;
-            Vector3 v3 = localEnd;
-
-            // Create all 8 vertices (4 bottom + 4 top)
-            Vector3[] vertices = new Vector3[]
-            {
-                // Bottom vertices (0-3)
-                v0,
-                v1,
-                v2,
-                v3,
-                // Top vertices (4-7)
-                v0 + Vector3.up * wallHeight,
-                v1 + Vector3.up * wallHeight,
-                v2 + Vector3.up * wallHeight,
-                v3 + Vector3.up * wallHeight
-            };
-
-            // Define faces (6 faces, each as 2 triangles)
-            Face[] faces = new Face[]
-            {
-                // Bottom face (facing down)
-                new Face(new int[] { 0, 2, 1, 0, 3, 2 }),
-                // Top face (facing up)
-                new Face(new int[] { 4, 5, 6, 4, 6, 7 }),
-                // Front face
-                new Face(new int[] { 0, 1, 5, 0, 5, 4 }),
-                // Right face
-                new Face(new int[] { 1, 2, 6, 1, 6, 5 }),
-                // Back face
-                new Face(new int[] { 2, 3, 7, 2, 7, 6 }),
-                // Left face
-                new Face(new int[] { 3, 0, 4, 3, 4, 7 })
-            };
-
-            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices, faces);
-            pbMesh.gameObject.transform.SetParent(wallObj.transform);
+            // Create ProBuilder mesh
+            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices.ToArray(), faces.ToArray());
+            pbMesh.gameObject.transform.SetParent(meshObj.transform);
             pbMesh.gameObject.transform.localPosition = Vector3.zero;
-            pbMesh.gameObject.name = name + "_Mesh";
+            pbMesh.gameObject.name = "UnifiedMesh";
 
-            // Apply material
-            if (wallMaterial != null)
-            {
-                var renderer = pbMesh.GetComponent<MeshRenderer>();
-                if (renderer != null)
-                {
-                    renderer.sharedMaterial = wallMaterial;
-                }
-            }
+            // Apply materials
+            ApplyMaterialsToFaces(pbMesh);
 
             pbMesh.ToMesh();
             pbMesh.Refresh();
         }
 
         /// <summary>
-        /// Create corridor ceiling
+        /// Add wall vertices and faces to the mesh
         /// </summary>
-        private void CreateCorridorCeiling(GameObject parent, Vector3 start, float distance, bool isHorizontalX)
+        private void AddWallToMesh(List<Vector3> vertices, List<Face> faces, ref int vertexOffset,
+            Vector3 start, Vector3 end, Vector3 perpendicular)
         {
-            GameObject ceilingObj = new GameObject("Ceiling");
-            ceilingObj.transform.SetParent(parent.transform);
-            ceilingObj.transform.position = start + Vector3.up * wallHeight;
+            Vector3 thickness = perpendicular.normalized * wallThickness;
 
-            Vector3[] vertices;
+            // Wall vertices (4 bottom + 4 top)
+            vertices.Add(start);
+            vertices.Add(start + thickness);
+            vertices.Add(end + thickness);
+            vertices.Add(end);
+            vertices.Add(start + Vector3.up * wallHeight);
+            vertices.Add(start + thickness + Vector3.up * wallHeight);
+            vertices.Add(end + thickness + Vector3.up * wallHeight);
+            vertices.Add(end + Vector3.up * wallHeight);
+
+            // Wall faces
+            int v = vertexOffset;
+            faces.Add(new Face(new int[] { v+0, v+1, v+5, v+0, v+5, v+4 })); // Front
+            faces.Add(new Face(new int[] { v+1, v+2, v+6, v+1, v+6, v+5 })); // Right
+            faces.Add(new Face(new int[] { v+2, v+3, v+7, v+2, v+7, v+6 })); // Back
+            faces.Add(new Face(new int[] { v+3, v+0, v+4, v+3, v+4, v+7 })); // Left
+
+            vertexOffset += 8;
+        }
+
+        /// <summary>
+        /// Apply materials to different parts of the corridor mesh
+        /// </summary>
+        private void ApplyMaterialsToFaces(ProBuilderMesh pbMesh)
+        {
+            var renderer = pbMesh.GetComponent<MeshRenderer>();
+            if (renderer != null)
+            {
+                // For now, use single material for entire corridor
+                // Can be enhanced later to use different materials per face
+                renderer.sharedMaterial = floorMaterial;
+            }
+        }
+
+        /// <summary>
+        /// Create a corner piece to connect two perpendicular corridor segments as unified mesh
+        /// </summary>
+        public GameObject CreateCorridorCorner(Vector3 cornerPosition, Transform parent, int corridorIndex)
+        {
+            GameObject cornerObj = new GameObject($"CorridorCorner_{corridorIndex}");
+            cornerObj.transform.SetParent(parent);
+            cornerObj.transform.position = cornerPosition;
+
             float halfWidth = corridorWidth / 2f;
+            List<Vector3> vertices = new List<Vector3>();
+            List<Face> faces = new List<Face>();
 
-            if (isHorizontalX)
-            {
-                // Horizontal corridor ceiling
-                vertices = new Vector3[] {
-                    new Vector3(0, 0, halfWidth),
-                    new Vector3(distance, 0, halfWidth),
-                    new Vector3(distance, 0, -halfWidth),
-                    new Vector3(0, 0, -halfWidth)
-                };
-            }
-            else
-            {
-                // Vertical corridor ceiling
-                vertices = new Vector3[] {
-                    new Vector3(halfWidth, 0, 0),
-                    new Vector3(halfWidth, 0, distance),
-                    new Vector3(-halfWidth, 0, distance),
-                    new Vector3(-halfWidth, 0, 0)
-                };
-            }
-
-            // Create face with reversed winding for downward-facing normals (same as room ceiling)
-            Face face = new Face(new int[] { 0, 2, 1, 0, 3, 2 });
-
-            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices, new Face[] { face });
-            pbMesh.gameObject.transform.SetParent(ceilingObj.transform);
-            pbMesh.gameObject.transform.localPosition = Vector3.zero;
-            pbMesh.gameObject.name = "CeilingMesh";
-
-            // Apply material
-            if (ceilingMaterial != null)
-            {
-                var renderer = pbMesh.GetComponent<MeshRenderer>();
-                if (renderer != null)
-                {
-                    renderer.sharedMaterial = ceilingMaterial;
-                }
-            }
-
-            pbMesh.ToMesh();
-            pbMesh.Refresh();
-        }
-
-        /// <summary>
-        /// Create corner floor piece
-        /// </summary>
-        private void CreateCornerFloor(GameObject parent, Vector3 cornerPosition, float halfWidth)
-        {
-            GameObject floorObj = new GameObject("CornerFloor");
-            floorObj.transform.SetParent(parent.transform);
-            floorObj.transform.position = cornerPosition;
-
-            // Create square floor piece at corner
-            Vector3[] vertices = new Vector3[]
-            {
+            // Corner floor vertices
+            Vector3[] floorVerts = new Vector3[] {
                 new Vector3(-halfWidth, 0, -halfWidth),
                 new Vector3(halfWidth, 0, -halfWidth),
                 new Vector3(halfWidth, 0, halfWidth),
                 new Vector3(-halfWidth, 0, halfWidth)
             };
+            vertices.AddRange(floorVerts);
+            faces.Add(new Face(new int[] { 0, 3, 2, 0, 2, 1 }));
 
-            // Create face (counter-clockwise winding for upward-facing normals)
-            Face face = new Face(new int[] { 0, 3, 2, 0, 2, 1 });
+            // Corner ceiling vertices
+            Vector3[] ceilingVerts = new Vector3[4];
+            for (int i = 0; i < 4; i++)
+            {
+                ceilingVerts[i] = floorVerts[i] + Vector3.up * wallHeight;
+            }
+            vertices.AddRange(ceilingVerts);
+            faces.Add(new Face(new int[] { 4, 6, 5, 4, 7, 6 }));
 
-            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices, new Face[] { face });
-            pbMesh.gameObject.transform.SetParent(floorObj.transform);
+            // Create unified mesh
+            GameObject meshObj = new GameObject("CornerMesh");
+            meshObj.transform.SetParent(cornerObj.transform);
+            meshObj.transform.localPosition = Vector3.zero;
+
+            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices.ToArray(), faces.ToArray());
+            pbMesh.gameObject.transform.SetParent(meshObj.transform);
             pbMesh.gameObject.transform.localPosition = Vector3.zero;
-            pbMesh.gameObject.name = "CornerFloorMesh";
+            pbMesh.gameObject.name = "UnifiedCornerMesh";
 
             // Apply material
-            if (floorMaterial != null)
+            var renderer = pbMesh.GetComponent<MeshRenderer>();
+            if (renderer != null)
             {
-                var renderer = pbMesh.GetComponent<MeshRenderer>();
-                if (renderer != null)
-                {
-                    renderer.sharedMaterial = floorMaterial;
-                }
+                renderer.sharedMaterial = floorMaterial;
             }
 
             pbMesh.ToMesh();
             pbMesh.Refresh();
-        }
 
-        /// <summary>
-        /// Create corner ceiling piece
-        /// </summary>
-        private void CreateCornerCeiling(GameObject parent, Vector3 cornerPosition, float halfWidth)
-        {
-            GameObject ceilingObj = new GameObject("CornerCeiling");
-            ceilingObj.transform.SetParent(parent.transform);
-            ceilingObj.transform.position = cornerPosition + Vector3.up * wallHeight;
-
-            // Create square ceiling piece at corner
-            Vector3[] vertices = new Vector3[]
-            {
-                new Vector3(-halfWidth, 0, -halfWidth),
-                new Vector3(halfWidth, 0, -halfWidth),
-                new Vector3(halfWidth, 0, halfWidth),
-                new Vector3(-halfWidth, 0, halfWidth)
-            };
-
-            // Create face with reversed winding for downward-facing normals
-            Face face = new Face(new int[] { 0, 2, 1, 0, 3, 2 });
-
-            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices, new Face[] { face });
-            pbMesh.gameObject.transform.SetParent(ceilingObj.transform);
-            pbMesh.gameObject.transform.localPosition = Vector3.zero;
-            pbMesh.gameObject.name = "CornerCeilingMesh";
-
-            // Apply material
-            if (ceilingMaterial != null)
-            {
-                var renderer = pbMesh.GetComponent<MeshRenderer>();
-                if (renderer != null)
-                {
-                    renderer.sharedMaterial = ceilingMaterial;
-                }
-            }
-
-            pbMesh.ToMesh();
-            pbMesh.Refresh();
+            return cornerObj;
         }
     }
 }
