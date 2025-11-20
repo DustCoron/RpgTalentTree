@@ -86,7 +86,7 @@ namespace RpgTalentTree.Core.Dungeon
             }
 
             // Create face (counter-clockwise winding for upward-facing normals)
-            Face face = new Face(new int[] { 0, 1, 2, 0, 2, 3 });
+            Face face = new Face(new int[] { 0, 3, 2, 0, 2, 1 });
 
             ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices, new Face[] { face });
             pbMesh.gameObject.transform.SetParent(floorObj.transform);
@@ -248,7 +248,7 @@ namespace RpgTalentTree.Core.Dungeon
                 };
             }
 
-            // Create face with reversed winding for ceiling (faces down)
+            // Create face with reversed winding for downward-facing normals (same as room ceiling)
             Face face = new Face(new int[] { 0, 2, 1, 0, 3, 2 });
 
             ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices, new Face[] { face });
