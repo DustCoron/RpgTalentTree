@@ -10,15 +10,17 @@ namespace RpgTalentTree.Core.Dungeon
     {
         private Material floorMaterial;
         private WallGenerator wallGenerator;
+        private float wallHeight;
 
         public RoomGenerator(Material floorMaterial, Material wallMaterial, float wallHeight, float wallThickness)
         {
             this.floorMaterial = floorMaterial;
+            this.wallHeight = wallHeight;
             this.wallGenerator = new WallGenerator(wallMaterial, wallHeight, wallThickness);
         }
 
         /// <summary>
-        /// Create a complete room with floor and walls
+        /// Create a complete room with floor, walls, and ceiling
         /// </summary>
         public GameObject CreateRoom(DungeonRoom room, Transform parent, int roomIndex)
         {
@@ -35,6 +37,9 @@ namespace RpgTalentTree.Core.Dungeon
 
             // Create walls
             CreateWalls(roomObject, room);
+
+            // Create ceiling
+            CreateCeiling(roomObject, room);
 
             return roomObject;
         }
@@ -82,6 +87,43 @@ namespace RpgTalentTree.Core.Dungeon
         private void CreateWalls(GameObject parent, DungeonRoom room)
         {
             wallGenerator.CreateWalls(parent, room);
+        }
+
+        /// <summary>
+        /// Create ceiling mesh using ProBuilder
+        /// </summary>
+        private void CreateCeiling(GameObject parent, DungeonRoom room)
+        {
+            GameObject ceilingObj = new GameObject("Ceiling");
+            ceilingObj.transform.SetParent(parent.transform);
+            ceilingObj.transform.localPosition = new Vector3(0, wallHeight, 0);
+
+            ProBuilderMesh pbMesh = ceilingObj.AddComponent<ProBuilderMesh>();
+
+            // Create a plane shape (inverted normals for ceiling)
+            pbMesh.CreateShapeFromPolygon(
+                new Vector3[] {
+                    new Vector3(0, 0, room.Size.z),
+                    new Vector3(room.Size.x, 0, room.Size.z),
+                    new Vector3(room.Size.x, 0, 0),
+                    new Vector3(0, 0, 0)
+                },
+                0f, // extrusion height
+                true // flip normals (ceiling faces down)
+            );
+
+            // Apply material
+            if (floorMaterial != null)
+            {
+                var renderer = ceilingObj.GetComponent<MeshRenderer>();
+                if (renderer != null)
+                {
+                    renderer.sharedMaterial = floorMaterial;
+                }
+            }
+
+            pbMesh.ToMesh();
+            pbMesh.Refresh();
         }
     }
 }
