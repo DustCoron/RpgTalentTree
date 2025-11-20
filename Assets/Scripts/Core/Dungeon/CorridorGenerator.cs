@@ -46,7 +46,7 @@ namespace RpgTalentTree.Core.Dungeon
             bool isHorizontalX = Mathf.Abs(dir.x) > Mathf.Abs(dir.z);
 
             // Create single unified mesh for entire corridor
-            CreateUnifiedCorridorMesh(corridorObj, distance, isHorizontalX);
+            CreateUnifiedCorridorMesh(corridorObj, distance, isHorizontalX, dir);
 
             return corridorObj;
         }
@@ -54,7 +54,7 @@ namespace RpgTalentTree.Core.Dungeon
         /// <summary>
         /// Create unified corridor mesh with floor, walls, and ceiling
         /// </summary>
-        private void CreateUnifiedCorridorMesh(GameObject parent, float distance, bool isHorizontalX)
+        private void CreateUnifiedCorridorMesh(GameObject parent, float distance, bool isHorizontalX, Vector3 dir)
         {
             GameObject meshObj = new GameObject("CorridorMesh");
             meshObj.transform.SetParent(parent.transform);
