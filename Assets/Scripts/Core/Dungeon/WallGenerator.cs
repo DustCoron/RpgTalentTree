@@ -108,22 +108,22 @@ namespace RpgTalentTree.Core.Dungeon
             bool isHorizontal = wallSide == Doorway.WallSide.North || wallSide == Doorway.WallSide.South;
             float columnWidth = 0.3f;
             float columnDepth = 0.3f;
-            float columnHeight = wallHeight * 0.8f; // Columns slightly shorter than wall
+            float columnHeight = wallHeight; // Columns same height as walls
 
-            // Calculate column positions
+            // Calculate column positions - positioned exactly at doorway edges (wall ends)
             Vector3 leftColumnPos, rightColumnPos;
 
             if (isHorizontal)
             {
-                // For North/South walls
-                leftColumnPos = new Vector3(corner1.x + doorwayStart - columnWidth / 2f, 0, corner1.z);
-                rightColumnPos = new Vector3(corner1.x + doorwayEnd - columnWidth / 2f, 0, corner1.z);
+                // For North/South walls - columns along X axis at doorway edges
+                leftColumnPos = new Vector3(corner1.x + doorwayStart, 0, corner1.z);
+                rightColumnPos = new Vector3(corner1.x + doorwayEnd, 0, corner1.z);
             }
             else
             {
-                // For East/West walls
-                leftColumnPos = new Vector3(corner1.x, 0, corner1.z + doorwayStart - columnDepth / 2f);
-                rightColumnPos = new Vector3(corner1.x, 0, corner1.z + doorwayEnd - columnDepth / 2f);
+                // For East/West walls - columns along Z axis at doorway edges
+                leftColumnPos = new Vector3(corner1.x, 0, corner1.z + doorwayStart);
+                rightColumnPos = new Vector3(corner1.x, 0, corner1.z + doorwayEnd);
             }
 
             // Create left column
@@ -156,11 +156,11 @@ namespace RpgTalentTree.Core.Dungeon
             {
                 // Bottom vertices (0-3)
                 v0, v1, v2, v3,
-                // Top vertices (4-7) - slightly narrower for tapered effect
-                v0 * 0.9f + Vector3.up * height,
-                v1 * 0.9f + Vector3.up * height,
-                v2 * 0.9f + Vector3.up * height,
-                v3 * 0.9f + Vector3.up * height
+                // Top vertices (4-7) - same width as bottom (straight column)
+                v0 + Vector3.up * height,
+                v1 + Vector3.up * height,
+                v2 + Vector3.up * height,
+                v3 + Vector3.up * height
             };
 
             // Define faces (6 faces, each as 2 triangles)
