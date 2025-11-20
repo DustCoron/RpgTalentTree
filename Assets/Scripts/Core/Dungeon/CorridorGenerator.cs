@@ -151,9 +151,18 @@ namespace RpgTalentTree.Core.Dungeon
 
             ProBuilderMesh pbMesh = wallObj.AddComponent<ProBuilderMesh>();
 
-            // Create wall polygon
+            // Create wall polygon with 4 corners (a thin rectangle)
+            float wallThickness = 0.1f;
+            Vector3 direction = (localEnd - localStart).normalized;
+            Vector3 perpendicular = new Vector3(-direction.z, 0, direction.x) * wallThickness;
+
             pbMesh.CreateShapeFromPolygon(
-                new Vector3[] { localStart, localEnd },
+                new Vector3[] {
+                    localStart,
+                    localStart + perpendicular,
+                    localEnd + perpendicular,
+                    localEnd
+                },
                 wallHeight,
                 false
             );
