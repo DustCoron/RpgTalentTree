@@ -103,7 +103,7 @@ namespace RpgTalentTree.Core.Dungeon
 
             // Initialize corridor generator
             Material corridorFloorMat = corridorMaterial != null ? corridorMaterial : floorMaterial;
-            corridorGenerator = new CorridorGenerator(corridorFloorMat, wallMaterial, floorMaterial, wallHeight, corridorWidth);
+            corridorGenerator = new CorridorGenerator(corridorFloorMat, wallMaterial, floorMaterial, wallHeight, wallThickness, corridorWidth);
         }
 
         /// <summary>

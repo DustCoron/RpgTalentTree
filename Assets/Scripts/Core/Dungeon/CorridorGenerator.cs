@@ -12,14 +12,16 @@ namespace RpgTalentTree.Core.Dungeon
         private Material wallMaterial;
         private Material ceilingMaterial;
         private float wallHeight;
+        private float wallThickness;
         private int corridorWidth;
 
-        public CorridorGenerator(Material floorMaterial, Material wallMaterial, Material ceilingMaterial, float wallHeight, int corridorWidth)
+        public CorridorGenerator(Material floorMaterial, Material wallMaterial, Material ceilingMaterial, float wallHeight, float wallThickness, int corridorWidth)
         {
             this.floorMaterial = floorMaterial;
             this.wallMaterial = wallMaterial;
             this.ceilingMaterial = ceilingMaterial ?? floorMaterial;
             this.wallHeight = wallHeight;
+            this.wallThickness = wallThickness;
             this.corridorWidth = corridorWidth;
         }
 
@@ -154,9 +156,8 @@ namespace RpgTalentTree.Core.Dungeon
             wallObj.transform.position = worldStart;
 
             // Create wall polygon with 4 corners (a thin rectangle)
-            float wallThickness = 0.1f;
             Vector3 direction = (localEnd - localStart).normalized;
-            Vector3 perpendicular = new Vector3(-direction.z, 0, direction.x) * wallThickness;
+            Vector3 perpendicular = new Vector3(-direction.z, 0, direction.x) * this.wallThickness;
 
             // Define base rectangle vertices
             Vector3 v0 = localStart;
