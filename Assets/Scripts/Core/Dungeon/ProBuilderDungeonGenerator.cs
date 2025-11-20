@@ -282,6 +282,9 @@ namespace RpgTalentTree.Core.Dungeon
             // Create corridors from doorway to doorway
             CreateCorridor(doorwayA, corridorCorner, corridorIndex, "Horizontal");
             CreateCorridor(corridorCorner, doorwayB, corridorIndex, "Vertical");
+
+            // Create corner piece at junction
+            CreateCorridorCorner(corridorCorner, corridorIndex);
         }
 
         /// <summary>
@@ -304,6 +307,12 @@ namespace RpgTalentTree.Core.Dungeon
             // Create corridor from roomA doorway to stairs start
             CreateCorridor(doorwayA, stairsStart, corridorIndex, "ToStairs");
 
+            // Create corner at stairs start if corridor changes direction
+            if (Mathf.Abs(doorwayA.x - stairsStart.x) > 0.1f && Mathf.Abs(doorwayA.z - stairsStart.z) > 0.1f)
+            {
+                CreateCorridorCorner(stairsStart, corridorIndex);
+            }
+
             // Create stairs from lower to higher level
             if (stairsGenerator != null)
             {
@@ -312,6 +321,12 @@ namespace RpgTalentTree.Core.Dungeon
 
             // Create corridor from stairs end to roomB doorway
             CreateCorridor(stairsEnd, doorwayB, corridorIndex, "FromStairs");
+
+            // Create corner at stairs end if corridor changes direction
+            if (Mathf.Abs(stairsEnd.x - doorwayB.x) > 0.1f && Mathf.Abs(stairsEnd.z - doorwayB.z) > 0.1f)
+            {
+                CreateCorridorCorner(stairsEnd, corridorIndex);
+            }
         }
 
         /// <summary>
@@ -359,6 +374,14 @@ namespace RpgTalentTree.Core.Dungeon
         private void CreateCorridor(Vector3 start, Vector3 end, int corridorIndex, string direction)
         {
             corridorGenerator.CreateCorridor(start, end, dungeonParent.transform, corridorIndex, direction);
+        }
+
+        /// <summary>
+        /// Create a corner piece at corridor junction
+        /// </summary>
+        private void CreateCorridorCorner(Vector3 cornerPosition, int corridorIndex)
+        {
+            corridorGenerator.CreateCorridorCorner(cornerPosition, dungeonParent.transform, corridorIndex);
         }
 
         private void OnValidate()

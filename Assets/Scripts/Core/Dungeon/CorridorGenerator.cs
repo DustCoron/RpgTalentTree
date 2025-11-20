@@ -55,6 +55,25 @@ namespace RpgTalentTree.Core.Dungeon
         }
 
         /// <summary>
+        /// Create a corner piece to connect two perpendicular corridor segments
+        /// </summary>
+        public GameObject CreateCorridorCorner(Vector3 cornerPosition, Transform parent, int corridorIndex)
+        {
+            GameObject cornerObj = new GameObject($"CorridorCorner_{corridorIndex}");
+            cornerObj.transform.SetParent(parent);
+
+            float halfWidth = corridorWidth / 2f;
+
+            // Create corner floor
+            CreateCornerFloor(cornerObj, cornerPosition, halfWidth);
+
+            // Create corner ceiling
+            CreateCornerCeiling(cornerObj, cornerPosition, halfWidth);
+
+            return cornerObj;
+        }
+
+        /// <summary>
         /// Create corridor floor
         /// </summary>
         private void CreateCorridorFloor(GameObject parent, Vector3 start, float distance, bool isHorizontalX)
@@ -256,6 +275,86 @@ namespace RpgTalentTree.Core.Dungeon
             pbMesh.gameObject.transform.SetParent(ceilingObj.transform);
             pbMesh.gameObject.transform.localPosition = Vector3.zero;
             pbMesh.gameObject.name = "CeilingMesh";
+
+            // Apply material
+            if (ceilingMaterial != null)
+            {
+                var renderer = pbMesh.GetComponent<MeshRenderer>();
+                if (renderer != null)
+                {
+                    renderer.sharedMaterial = ceilingMaterial;
+                }
+            }
+
+            pbMesh.ToMesh();
+            pbMesh.Refresh();
+        }
+
+        /// <summary>
+        /// Create corner floor piece
+        /// </summary>
+        private void CreateCornerFloor(GameObject parent, Vector3 cornerPosition, float halfWidth)
+        {
+            GameObject floorObj = new GameObject("CornerFloor");
+            floorObj.transform.SetParent(parent.transform);
+            floorObj.transform.position = cornerPosition;
+
+            // Create square floor piece at corner
+            Vector3[] vertices = new Vector3[]
+            {
+                new Vector3(-halfWidth, 0, -halfWidth),
+                new Vector3(halfWidth, 0, -halfWidth),
+                new Vector3(halfWidth, 0, halfWidth),
+                new Vector3(-halfWidth, 0, halfWidth)
+            };
+
+            // Create face (counter-clockwise winding for upward-facing normals)
+            Face face = new Face(new int[] { 0, 3, 2, 0, 2, 1 });
+
+            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices, new Face[] { face });
+            pbMesh.gameObject.transform.SetParent(floorObj.transform);
+            pbMesh.gameObject.transform.localPosition = Vector3.zero;
+            pbMesh.gameObject.name = "CornerFloorMesh";
+
+            // Apply material
+            if (floorMaterial != null)
+            {
+                var renderer = pbMesh.GetComponent<MeshRenderer>();
+                if (renderer != null)
+                {
+                    renderer.sharedMaterial = floorMaterial;
+                }
+            }
+
+            pbMesh.ToMesh();
+            pbMesh.Refresh();
+        }
+
+        /// <summary>
+        /// Create corner ceiling piece
+        /// </summary>
+        private void CreateCornerCeiling(GameObject parent, Vector3 cornerPosition, float halfWidth)
+        {
+            GameObject ceilingObj = new GameObject("CornerCeiling");
+            ceilingObj.transform.SetParent(parent.transform);
+            ceilingObj.transform.position = cornerPosition + Vector3.up * wallHeight;
+
+            // Create square ceiling piece at corner
+            Vector3[] vertices = new Vector3[]
+            {
+                new Vector3(-halfWidth, 0, -halfWidth),
+                new Vector3(halfWidth, 0, -halfWidth),
+                new Vector3(halfWidth, 0, halfWidth),
+                new Vector3(-halfWidth, 0, halfWidth)
+            };
+
+            // Create face with reversed winding for downward-facing normals
+            Face face = new Face(new int[] { 0, 2, 1, 0, 3, 2 });
+
+            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices, new Face[] { face });
+            pbMesh.gameObject.transform.SetParent(ceilingObj.transform);
+            pbMesh.gameObject.transform.localPosition = Vector3.zero;
+            pbMesh.gameObject.name = "CornerCeilingMesh";
 
             // Apply material
             if (ceilingMaterial != null)
