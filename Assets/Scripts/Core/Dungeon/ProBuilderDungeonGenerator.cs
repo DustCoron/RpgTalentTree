@@ -24,6 +24,16 @@ namespace RpgTalentTree.Core.Dungeon
         [SerializeField] private Material floorMaterial;
         [SerializeField] private Material wallMaterial;
         [SerializeField] private Material corridorMaterial;
+        [SerializeField] private Material stairMaterial;
+
+        [Header("Multi-Level Settings")]
+        [SerializeField] private bool enableMultiLevel = false;
+        [SerializeField] private float minFloorHeight = 0f;
+        [SerializeField] private float maxFloorHeight = 6f;
+        [SerializeField] private float floorHeightStep = 3f;
+        [SerializeField] private bool enableStairs = true;
+        [SerializeField] private float stepHeight = 0.2f;
+        [SerializeField] private float stepDepth = 0.5f;
 
         [Header("Generation")]
         [SerializeField] private bool generateOnStart = false;
@@ -33,6 +43,7 @@ namespace RpgTalentTree.Core.Dungeon
         private GameObject dungeonParent;
         private System.Random random;
         private RoomGenerator roomGenerator;
+        private StairsGenerator stairsGenerator;
 
         private void Start()
         {
@@ -82,6 +93,10 @@ namespace RpgTalentTree.Core.Dungeon
 
             // Initialize room generator
             roomGenerator = new RoomGenerator(floorMaterial, wallMaterial, wallHeight, wallThickness);
+
+            // Initialize stairs generator
+            Material stairMat = stairMaterial != null ? stairMaterial : floorMaterial;
+            stairsGenerator = new StairsGenerator(stairMat, stepHeight, stepDepth, corridorWidth);
         }
 
         /// <summary>
@@ -106,7 +121,16 @@ namespace RpgTalentTree.Core.Dungeon
                 Vector3Int position = new Vector3Int(x, 0, z);
                 Vector3Int size = new Vector3Int(width, (int)wallHeight, depth);
 
-                DungeonRoom newRoom = new DungeonRoom(position, size);
+                // Generate random floor height if multi-level is enabled
+                float floorHeight = 0f;
+                if (enableMultiLevel)
+                {
+                    int heightLevels = Mathf.FloorToInt((maxFloorHeight - minFloorHeight) / floorHeightStep) + 1;
+                    int randomLevel = random.Next(0, heightLevels);
+                    floorHeight = minFloorHeight + (randomLevel * floorHeightStep);
+                }
+
+                DungeonRoom newRoom = new DungeonRoom(position, size, floorHeight);
 
                 // Check for overlaps
                 bool overlaps = false;
@@ -155,30 +179,77 @@ namespace RpgTalentTree.Core.Dungeon
         }
 
         /// <summary>
-        /// Connect two rooms with an L-shaped corridor
+        /// Connect two rooms with an L-shaped corridor (with optional stairs)
         /// </summary>
         private void ConnectRooms(DungeonRoom roomA, DungeonRoom roomB, int corridorIndex)
         {
             Vector3 startPos = roomA.GetCenter();
             Vector3 endPos = roomB.GetCenter();
 
+            float heightDiff = endPos.y - startPos.y;
+            bool needsStairs = enableStairs && Mathf.Abs(heightDiff) > 0.1f;
+
+            if (needsStairs)
+            {
+                // Multi-level connection with stairs
+                ConnectRoomsWithStairs(roomA, roomB, corridorIndex, startPos, endPos);
+            }
+            else
+            {
+                // Same-level connection
+                ConnectRoomsSameLevel(roomA, roomB, corridorIndex, startPos, endPos);
+            }
+        }
+
+        /// <summary>
+        /// Connect two rooms on the same level
+        /// </summary>
+        private void ConnectRoomsSameLevel(DungeonRoom roomA, DungeonRoom roomB, int corridorIndex, Vector3 startPos, Vector3 endPos)
+        {
             // Create L-shaped corridor (horizontal then vertical)
             Vector3 cornerPos = new Vector3(endPos.x, startPos.y, startPos.z);
 
             // Add doorways where corridors meet rooms
-            // Doorway at roomA exit (horizontal corridor start)
             Vector3 doorwayA = FindRoomBoundaryIntersection(roomA, startPos, cornerPos);
             roomA.AddDoorway(doorwayA, corridorWidth);
 
-            // Doorway at roomB entrance (vertical corridor end)
             Vector3 doorwayB = FindRoomBoundaryIntersection(roomB, endPos, cornerPos);
             roomB.AddDoorway(doorwayB, corridorWidth);
 
-            // Horizontal corridor
+            // Create corridors
             CreateCorridor(startPos, cornerPos, corridorIndex, "Horizontal");
-
-            // Vertical corridor
             CreateCorridor(cornerPos, endPos, corridorIndex, "Vertical");
+        }
+
+        /// <summary>
+        /// Connect two rooms at different heights with stairs
+        /// </summary>
+        private void ConnectRoomsWithStairs(DungeonRoom roomA, DungeonRoom roomB, int corridorIndex, Vector3 startPos, Vector3 endPos)
+        {
+            // Create horizontal corridor at lower level
+            Vector3 midPoint = new Vector3((startPos.x + endPos.x) / 2f, startPos.y, (startPos.z + endPos.z) / 2f);
+
+            // Find doorway for roomA
+            Vector3 doorwayA = FindRoomBoundaryIntersection(roomA, startPos, midPoint);
+            roomA.AddDoorway(doorwayA, corridorWidth);
+
+            // Create corridor from roomA to stairs start
+            Vector3 stairsStart = new Vector3(midPoint.x, startPos.y, midPoint.z);
+            CreateCorridor(startPos, stairsStart, corridorIndex, "ToStairs");
+
+            // Create stairs from lower to higher level
+            Vector3 stairsEnd = new Vector3(midPoint.x, endPos.y, midPoint.z);
+            if (stairsGenerator != null)
+            {
+                stairsGenerator.CreateStairs(stairsStart, stairsEnd, dungeonParent.transform, corridorIndex);
+            }
+
+            // Find doorway for roomB
+            Vector3 doorwayB = FindRoomBoundaryIntersection(roomB, endPos, stairsEnd);
+            roomB.AddDoorway(doorwayB, corridorWidth);
+
+            // Create corridor from stairs end to roomB
+            CreateCorridor(stairsEnd, endPos, corridorIndex, "FromStairs");
         }
 
         /// <summary>
@@ -345,6 +416,12 @@ namespace RpgTalentTree.Core.Dungeon
             maxRoomSize.y = Mathf.Max(minRoomSize.y, maxRoomSize.y);
             wallHeight = Mathf.Max(1f, wallHeight);
             corridorWidth = Mathf.Max(1, corridorWidth);
+
+            // Clamp multi-level settings
+            maxFloorHeight = Mathf.Max(minFloorHeight, maxFloorHeight);
+            floorHeightStep = Mathf.Max(0.5f, floorHeightStep);
+            stepHeight = Mathf.Clamp(stepHeight, 0.1f, 0.5f);
+            stepDepth = Mathf.Clamp(stepDepth, 0.3f, 1f);
         }
     }
 }

@@ -29,7 +29,9 @@ namespace RpgTalentTree.Core.Dungeon
         {
             GameObject roomObject = new GameObject($"Room_{roomIndex}");
             roomObject.transform.SetParent(parent);
-            roomObject.transform.position = room.Position;
+
+            // Position room at its XZ coordinates with the specified floor height
+            roomObject.transform.position = new Vector3(room.Position.x, room.FloorHeight, room.Position.z);
 
             room.RoomObject = roomObject;
 

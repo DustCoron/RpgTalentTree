@@ -31,23 +31,37 @@ namespace RpgTalentTree.Core.Dungeon
         public Vector3Int Size { get; set; }
         public GameObject RoomObject { get; set; }
         public List<Doorway> Doorways { get; set; }
+        public float FloorHeight { get; set; }
 
-        public DungeonRoom(Vector3Int position, Vector3Int size)
+        public DungeonRoom(Vector3Int position, Vector3Int size, float floorHeight = 0f)
         {
             Position = position;
             Size = size;
+            FloorHeight = floorHeight;
             Doorways = new List<Doorway>();
         }
 
         /// <summary>
-        /// Get the center position of the room in world space
+        /// Get the center position of the room in world space (at floor level)
         /// </summary>
         public Vector3 GetCenter()
         {
             return new Vector3(
                 Position.x + Size.x / 2f,
-                Position.y,
+                FloorHeight,
                 Position.z + Size.z / 2f
+            );
+        }
+
+        /// <summary>
+        /// Get the floor position at a specific local XZ coordinate
+        /// </summary>
+        public Vector3 GetFloorPosition(float localX, float localZ)
+        {
+            return new Vector3(
+                Position.x + localX,
+                FloorHeight,
+                Position.z + localZ
             );
         }
 
