@@ -447,7 +447,7 @@ namespace RpgTalentTree.Core.Dungeon
             for (int i = 0; i < corners.Length; i++)
             {
                 ProBuilderMesh pillarMesh = ShapeGenerator.GenerateCylinder(
-                    PivotLocation.FirstCorner,
+                    PivotLocation.Center,   // Pivot at center
                     8,                      // 8-sided cylinder
                     pillarRadius,           // Radius
                     pillarHeight,           // Height
@@ -458,7 +458,9 @@ namespace RpgTalentTree.Core.Dungeon
                 GameObject pillarObj = pillarMesh.gameObject;
                 pillarObj.name = $"Pillar_Corner_{i}";
                 pillarObj.transform.SetParent(roomObj.transform);
-                pillarObj.transform.localPosition = corners[i];
+                // Offset position upward by half height since pivot is at center
+                Vector3 pillarPosition = corners[i] + new Vector3(0, pillarHeight / 2f, 0);
+                pillarObj.transform.localPosition = pillarPosition;
 
                 // Apply material
                 if (wallMaterial != null)
