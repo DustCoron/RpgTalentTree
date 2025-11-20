@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.ProBuilder;
+using UnityEngine.ProBuilder.MeshOperations;
 
 namespace RpgTalentTree.Core.Dungeon
 {
@@ -40,6 +42,15 @@ namespace RpgTalentTree.Core.Dungeon
         [SerializeField] private bool generateOnStart = false;
         [SerializeField] private int seed = 0;
 
+        [Header("Optimization")]
+        [SerializeField] private bool combineMeshes = true;
+        [Tooltip("Add decorative pillars in room corners")]
+        [SerializeField] private bool addPillars = true;
+        [Tooltip("Add torch holders on walls")]
+        [SerializeField] private bool addTorchHolders = false;
+        [Tooltip("Add ceiling decorations")]
+        [SerializeField] private bool addCeilingDecorations = false;
+
         private List<DungeonRoom> rooms = new List<DungeonRoom>();
         private GameObject dungeonParent;
         private System.Random random;
@@ -66,6 +77,8 @@ namespace RpgTalentTree.Core.Dungeon
             GenerateRooms();
             GenerateCorridorsAndDoorways();
             CreateRoomMeshes();
+            AddDecorations();
+            OptimizeMeshes();
             Debug.Log($"Dungeon generated with {rooms.Count} rooms");
         }
 
@@ -382,6 +395,199 @@ namespace RpgTalentTree.Core.Dungeon
         private void CreateCorridorCorner(Vector3 cornerPosition, int corridorIndex)
         {
             corridorGenerator.CreateCorridorCorner(cornerPosition, dungeonParent.transform, corridorIndex);
+        }
+
+        /// <summary>
+        /// Add decorative elements to the dungeon
+        /// </summary>
+        private void AddDecorations()
+        {
+            if (!addPillars && !addTorchHolders && !addCeilingDecorations)
+                return;
+
+            foreach (var room in rooms)
+            {
+                GameObject roomObj = dungeonParent.transform.Find($"Room_{rooms.IndexOf(room)}")?.gameObject;
+                if (roomObj == null) continue;
+
+                if (addPillars)
+                {
+                    AddRoomPillars(roomObj, room);
+                }
+
+                if (addTorchHolders)
+                {
+                    AddWallTorchHolders(roomObj, room);
+                }
+
+                if (addCeilingDecorations)
+                {
+                    AddCeilingDecoration(roomObj, room);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Add decorative pillars to room corners using ProBuilder's GenerateCylinder
+        /// </summary>
+        private void AddRoomPillars(GameObject roomObj, DungeonRoom room)
+        {
+            float pillarRadius = 0.2f;
+            float pillarHeight = wallHeight * 0.9f; // Slightly shorter than walls
+
+            // Corner positions
+            Vector3[] corners = new Vector3[]
+            {
+                new Vector3(0.5f, 0, 0.5f),                          // Bottom-left
+                new Vector3(room.Size.x - 0.5f, 0, 0.5f),           // Bottom-right
+                new Vector3(room.Size.x - 0.5f, 0, room.Size.z - 0.5f), // Top-right
+                new Vector3(0.5f, 0, room.Size.z - 0.5f)            // Top-left
+            };
+
+            for (int i = 0; i < corners.Length; i++)
+            {
+                ProBuilderMesh pillarMesh = ShapeGenerator.GenerateCylinder(
+                    PivotLocation.FirstCorner,
+                    8,                      // 8-sided cylinder
+                    pillarRadius,           // Radius
+                    pillarHeight,           // Height
+                    0,                      // No height cuts
+                    -1                      // No smoothing groups
+                );
+
+                GameObject pillarObj = pillarMesh.gameObject;
+                pillarObj.name = $"Pillar_Corner_{i}";
+                pillarObj.transform.SetParent(roomObj.transform);
+                pillarObj.transform.localPosition = corners[i];
+
+                // Apply material
+                if (wallMaterial != null)
+                {
+                    var renderer = pillarMesh.GetComponent<MeshRenderer>();
+                    if (renderer != null)
+                    {
+                        renderer.sharedMaterial = wallMaterial;
+                    }
+                }
+
+                pillarMesh.ToMesh();
+                pillarMesh.Refresh();
+            }
+        }
+
+        /// <summary>
+        /// Add torch holders to walls using ProBuilder's GeneratePipe
+        /// </summary>
+        private void AddWallTorchHolders(GameObject roomObj, DungeonRoom room)
+        {
+            float torchHeight = wallHeight * 0.6f; // Position at 60% of wall height
+            float torchRadius = 0.15f;
+            float torchThickness = 0.05f;
+            float wallOffset = 0.2f; // Distance from wall
+
+            // Place torch holders on each wall (centered)
+            Vector3[] torchPositions = new Vector3[]
+            {
+                new Vector3(room.Size.x / 2f, torchHeight, wallOffset),              // South wall
+                new Vector3(room.Size.x / 2f, torchHeight, room.Size.z - wallOffset), // North wall
+                new Vector3(wallOffset, torchHeight, room.Size.z / 2f),              // West wall
+                new Vector3(room.Size.x - wallOffset, torchHeight, room.Size.z / 2f) // East wall
+            };
+
+            for (int i = 0; i < torchPositions.Length; i++)
+            {
+                ProBuilderMesh torchMesh = ShapeGenerator.GeneratePipe(
+                    PivotLocation.Center,
+                    torchRadius,            // Outer radius
+                    0.1f,                   // Height (thin ring)
+                    torchThickness,         // Thickness
+                    12,                     // 12 segments around
+                    1                       // 1 height segment
+                );
+
+                GameObject torchObj = torchMesh.gameObject;
+                torchObj.name = $"TorchHolder_{i}";
+                torchObj.transform.SetParent(roomObj.transform);
+                torchObj.transform.localPosition = torchPositions[i];
+
+                // Apply material
+                if (wallMaterial != null)
+                {
+                    var renderer = torchMesh.GetComponent<MeshRenderer>();
+                    if (renderer != null)
+                    {
+                        renderer.sharedMaterial = wallMaterial;
+                    }
+                }
+
+                torchMesh.ToMesh();
+                torchMesh.Refresh();
+            }
+        }
+
+        /// <summary>
+        /// Add ceiling decoration using ProBuilder's GenerateIcosahedron
+        /// </summary>
+        private void AddCeilingDecoration(GameObject roomObj, DungeonRoom room)
+        {
+            // Create a decorative ceiling element at room center
+            float decorationRadius = Mathf.Min(room.Size.x, room.Size.z) * 0.15f;
+            Vector3 centerPosition = new Vector3(room.Size.x / 2f, wallHeight - 0.3f, room.Size.z / 2f);
+
+            ProBuilderMesh decorationMesh = ShapeGenerator.GenerateIcosahedron(
+                PivotLocation.Center,
+                decorationRadius,
+                0,                      // No subdivisions for simpler geometry
+                true,                   // Weld vertices
+                true                    // Manual UVs
+            );
+
+            GameObject decorationObj = decorationMesh.gameObject;
+            decorationObj.name = "CeilingDecoration";
+            decorationObj.transform.SetParent(roomObj.transform);
+            decorationObj.transform.localPosition = centerPosition;
+
+            // Apply material
+            if (wallMaterial != null)
+            {
+                var renderer = decorationMesh.GetComponent<MeshRenderer>();
+                if (renderer != null)
+                {
+                    renderer.sharedMaterial = wallMaterial;
+                }
+            }
+
+            decorationMesh.ToMesh();
+            decorationMesh.Refresh();
+        }
+
+        /// <summary>
+        /// Optimize dungeon by combining meshes using ProBuilder's CombineMeshes
+        /// </summary>
+        private void OptimizeMeshes()
+        {
+            if (!combineMeshes)
+                return;
+
+            // Get all ProBuilderMesh objects in the dungeon
+            var allMeshes = dungeonParent.GetComponentsInChildren<ProBuilderMesh>().ToList();
+
+            if (allMeshes.Count == 0)
+                return;
+
+            Debug.Log($"Optimizing dungeon: Combining {allMeshes.Count} meshes...");
+
+            // Use ProBuilder's CombineMeshes to merge all meshes
+            List<ProBuilderMesh> combinedMeshes = CombineMeshes.Combine(allMeshes);
+
+            Debug.Log($"Optimization complete: Reduced to {combinedMeshes.Count} mesh(es)");
+
+            // Parent combined meshes to dungeon
+            foreach (var mesh in combinedMeshes)
+            {
+                mesh.transform.SetParent(dungeonParent.transform);
+                mesh.gameObject.name = "CombinedDungeonMesh";
+            }
         }
 
         private void OnValidate()
