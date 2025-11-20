@@ -87,6 +87,9 @@ namespace RpgTalentTree.Core.Dungeon
                     CreateWallSegment(parent, wallSide, corner1, corner2, currentPos, doorwayStart, segmentIndex++);
                 }
 
+                // Create decorative columns on either side of doorway
+                CreateDoorwayColumns(parent, wallSide, corner1, corner2, doorwayStart, doorwayEnd, doorway);
+
                 currentPos = doorwayEnd;
             }
 
@@ -95,6 +98,105 @@ namespace RpgTalentTree.Core.Dungeon
             {
                 CreateWallSegment(parent, wallSide, corner1, corner2, currentPos, wallLength, segmentIndex);
             }
+        }
+
+        /// <summary>
+        /// Create decorative columns on either side of a doorway
+        /// </summary>
+        private void CreateDoorwayColumns(GameObject parent, Doorway.WallSide wallSide, Vector3 corner1, Vector3 corner2, float doorwayStart, float doorwayEnd, Doorway doorway)
+        {
+            bool isHorizontal = wallSide == Doorway.WallSide.North || wallSide == Doorway.WallSide.South;
+            float columnWidth = 0.3f;
+            float columnDepth = 0.3f;
+            float columnHeight = wallHeight * 0.8f; // Columns slightly shorter than wall
+
+            // Calculate column positions
+            Vector3 leftColumnPos, rightColumnPos;
+
+            if (isHorizontal)
+            {
+                // For North/South walls
+                leftColumnPos = new Vector3(corner1.x + doorwayStart - columnWidth / 2f, 0, corner1.z);
+                rightColumnPos = new Vector3(corner1.x + doorwayEnd - columnWidth / 2f, 0, corner1.z);
+            }
+            else
+            {
+                // For East/West walls
+                leftColumnPos = new Vector3(corner1.x, 0, corner1.z + doorwayStart - columnDepth / 2f);
+                rightColumnPos = new Vector3(corner1.x, 0, corner1.z + doorwayEnd - columnDepth / 2f);
+            }
+
+            // Create left column
+            CreateColumn(parent, $"Column_{wallSide}_Left", leftColumnPos, columnWidth, columnDepth, columnHeight);
+
+            // Create right column
+            CreateColumn(parent, $"Column_{wallSide}_Right", rightColumnPos, columnWidth, columnDepth, columnHeight);
+        }
+
+        /// <summary>
+        /// Create a decorative column using ProBuilder
+        /// </summary>
+        private void CreateColumn(GameObject parent, string name, Vector3 position, float width, float depth, float height)
+        {
+            GameObject columnObj = new GameObject(name);
+            columnObj.transform.SetParent(parent.transform);
+            columnObj.transform.localPosition = position;
+
+            float halfWidth = width / 2f;
+            float halfDepth = depth / 2f;
+
+            // Define base square vertices
+            Vector3 v0 = new Vector3(-halfWidth, 0, -halfDepth);
+            Vector3 v1 = new Vector3(halfWidth, 0, -halfDepth);
+            Vector3 v2 = new Vector3(halfWidth, 0, halfDepth);
+            Vector3 v3 = new Vector3(-halfWidth, 0, halfDepth);
+
+            // Create all 8 vertices (4 bottom + 4 top)
+            Vector3[] vertices = new Vector3[]
+            {
+                // Bottom vertices (0-3)
+                v0, v1, v2, v3,
+                // Top vertices (4-7) - slightly narrower for tapered effect
+                v0 * 0.9f + Vector3.up * height,
+                v1 * 0.9f + Vector3.up * height,
+                v2 * 0.9f + Vector3.up * height,
+                v3 * 0.9f + Vector3.up * height
+            };
+
+            // Define faces (6 faces, each as 2 triangles)
+            Face[] faces = new Face[]
+            {
+                // Bottom face (facing down)
+                new Face(new int[] { 0, 2, 1, 0, 3, 2 }),
+                // Top face (facing up)
+                new Face(new int[] { 4, 5, 6, 4, 6, 7 }),
+                // Front face
+                new Face(new int[] { 0, 1, 5, 0, 5, 4 }),
+                // Right face
+                new Face(new int[] { 1, 2, 6, 1, 6, 5 }),
+                // Back face
+                new Face(new int[] { 2, 3, 7, 2, 7, 6 }),
+                // Left face
+                new Face(new int[] { 3, 0, 4, 3, 4, 7 })
+            };
+
+            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices, faces);
+            pbMesh.gameObject.transform.SetParent(columnObj.transform);
+            pbMesh.gameObject.transform.localPosition = Vector3.zero;
+            pbMesh.gameObject.name = name + "_Mesh";
+
+            // Apply material
+            if (wallMaterial != null)
+            {
+                var renderer = pbMesh.GetComponent<MeshRenderer>();
+                if (renderer != null)
+                {
+                    renderer.sharedMaterial = wallMaterial;
+                }
+            }
+
+            pbMesh.ToMesh();
+            pbMesh.Refresh();
         }
 
         /// <summary>

@@ -35,6 +35,9 @@ namespace RpgTalentTree.Core.Dungeon
             // Create floor
             CreateFloor(roomObject, room);
 
+            // Create floor border details
+            CreateFloorBorder(roomObject, room);
+
             // Create walls
             CreateWalls(roomObject, room);
 
@@ -69,6 +72,100 @@ namespace RpgTalentTree.Core.Dungeon
             pbMesh.gameObject.transform.SetParent(floorObj.transform);
             pbMesh.gameObject.transform.localPosition = Vector3.zero;
             pbMesh.gameObject.name = "FloorMesh";
+
+            // Apply material
+            if (floorMaterial != null)
+            {
+                var renderer = pbMesh.GetComponent<MeshRenderer>();
+                if (renderer != null)
+                {
+                    renderer.sharedMaterial = floorMaterial;
+                }
+            }
+
+            pbMesh.ToMesh();
+            pbMesh.Refresh();
+        }
+
+        /// <summary>
+        /// Create decorative floor border
+        /// </summary>
+        private void CreateFloorBorder(GameObject parent, DungeonRoom room)
+        {
+            GameObject borderObj = new GameObject("FloorBorder");
+            borderObj.transform.SetParent(parent.transform);
+            borderObj.transform.localPosition = Vector3.zero;
+
+            float borderWidth = 0.3f;
+            float borderHeight = 0.05f; // Slightly raised border
+
+            // Create four border strips
+            // North border
+            CreateBorderStrip(borderObj, "Border_North",
+                new Vector3(0, borderHeight, room.Size.z - borderWidth),
+                room.Size.x, borderWidth, borderHeight);
+
+            // South border
+            CreateBorderStrip(borderObj, "Border_South",
+                new Vector3(0, borderHeight, 0),
+                room.Size.x, borderWidth, borderHeight);
+
+            // East border
+            CreateBorderStrip(borderObj, "Border_East",
+                new Vector3(room.Size.x - borderWidth, borderHeight, 0),
+                borderWidth, room.Size.z, borderHeight);
+
+            // West border
+            CreateBorderStrip(borderObj, "Border_West",
+                new Vector3(0, borderHeight, 0),
+                borderWidth, room.Size.z, borderHeight);
+        }
+
+        /// <summary>
+        /// Create a single border strip
+        /// </summary>
+        private void CreateBorderStrip(GameObject parent, string name, Vector3 position, float width, float depth, float height)
+        {
+            GameObject stripObj = new GameObject(name);
+            stripObj.transform.SetParent(parent.transform);
+            stripObj.transform.localPosition = position;
+
+            // Create raised border vertices
+            Vector3[] vertices = new Vector3[]
+            {
+                // Bottom vertices (0-3)
+                new Vector3(0, -height, 0),
+                new Vector3(width, -height, 0),
+                new Vector3(width, -height, depth),
+                new Vector3(0, -height, depth),
+                // Top vertices (4-7)
+                new Vector3(0, 0, 0),
+                new Vector3(width, 0, 0),
+                new Vector3(width, 0, depth),
+                new Vector3(0, 0, depth)
+            };
+
+            // Define faces (6 faces, each as 2 triangles)
+            Face[] faces = new Face[]
+            {
+                // Bottom face (facing down)
+                new Face(new int[] { 0, 2, 1, 0, 3, 2 }),
+                // Top face (facing up)
+                new Face(new int[] { 4, 7, 6, 4, 6, 5 }),
+                // Front face
+                new Face(new int[] { 0, 1, 5, 0, 5, 4 }),
+                // Right face
+                new Face(new int[] { 1, 2, 6, 1, 6, 5 }),
+                // Back face
+                new Face(new int[] { 2, 3, 7, 2, 7, 6 }),
+                // Left face
+                new Face(new int[] { 3, 0, 4, 3, 4, 7 })
+            };
+
+            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices, faces);
+            pbMesh.gameObject.transform.SetParent(stripObj.transform);
+            pbMesh.gameObject.transform.localPosition = Vector3.zero;
+            pbMesh.gameObject.name = name + "_Mesh";
 
             // Apply material
             if (floorMaterial != null)
