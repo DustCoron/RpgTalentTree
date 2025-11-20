@@ -50,7 +50,8 @@ namespace RpgTalentTree.Core.Dungeon
             ClearDungeon();
             InitializeGenerator();
             GenerateRooms();
-            GenerateCorridors();
+            GenerateCorridorsAndDoorways();
+            CreateRoomMeshes();
             Debug.Log($"Dungeon generated with {rooms.Count} rooms");
         }
 
@@ -120,24 +121,26 @@ namespace RpgTalentTree.Core.Dungeon
 
                 if (!overlaps)
                 {
-                    CreateRoomMesh(newRoom, rooms.Count);
                     rooms.Add(newRoom);
                 }
             }
         }
 
         /// <summary>
-        /// Create ProBuilder mesh for a room using RoomGenerator
+        /// Create ProBuilder meshes for all rooms
         /// </summary>
-        private void CreateRoomMesh(DungeonRoom room, int roomIndex)
+        private void CreateRoomMeshes()
         {
-            roomGenerator.CreateRoom(room, dungeonParent.transform, roomIndex);
+            for (int i = 0; i < rooms.Count; i++)
+            {
+                roomGenerator.CreateRoom(rooms[i], dungeonParent.transform, i);
+            }
         }
 
         /// <summary>
-        /// Generate corridors connecting rooms
+        /// Generate corridors connecting rooms and add doorways
         /// </summary>
-        private void GenerateCorridors()
+        private void GenerateCorridorsAndDoorways()
         {
             for (int i = 0; i < rooms.Count - 1; i++)
             {
@@ -162,11 +165,59 @@ namespace RpgTalentTree.Core.Dungeon
             // Create L-shaped corridor (horizontal then vertical)
             Vector3 cornerPos = new Vector3(endPos.x, startPos.y, startPos.z);
 
+            // Add doorways where corridors meet rooms
+            // Doorway at roomA exit (horizontal corridor start)
+            Vector3 doorwayA = FindRoomBoundaryIntersection(roomA, startPos, cornerPos);
+            roomA.AddDoorway(doorwayA, corridorWidth);
+
+            // Doorway at roomB entrance (vertical corridor end)
+            Vector3 doorwayB = FindRoomBoundaryIntersection(roomB, endPos, cornerPos);
+            roomB.AddDoorway(doorwayB, corridorWidth);
+
             // Horizontal corridor
             CreateCorridor(startPos, cornerPos, corridorIndex, "Horizontal");
 
             // Vertical corridor
             CreateCorridor(cornerPos, endPos, corridorIndex, "Vertical");
+        }
+
+        /// <summary>
+        /// Find where a line from inside the room intersects with the room boundary
+        /// </summary>
+        private Vector3 FindRoomBoundaryIntersection(DungeonRoom room, Vector3 insidePoint, Vector3 outsidePoint)
+        {
+            Vector3 direction = (outsidePoint - insidePoint).normalized;
+            Vector3 currentPoint = insidePoint;
+
+            // Step along the line until we hit the room boundary
+            float step = 0.1f;
+            float maxDistance = Vector3.Distance(insidePoint, outsidePoint);
+
+            for (float dist = 0; dist < maxDistance; dist += step)
+            {
+                currentPoint = insidePoint + direction * dist;
+
+                // Check if current point is outside the room bounds
+                if (!IsPointInRoom(room, currentPoint))
+                {
+                    // Step back slightly to get the boundary point
+                    return insidePoint + direction * (dist - step);
+                }
+            }
+
+            // Fallback: return the outside point
+            return outsidePoint;
+        }
+
+        /// <summary>
+        /// Check if a point is inside a room's bounds
+        /// </summary>
+        private bool IsPointInRoom(DungeonRoom room, Vector3 point)
+        {
+            return point.x >= room.Position.x &&
+                   point.x <= room.Position.x + room.Size.x &&
+                   point.z >= room.Position.z &&
+                   point.z <= room.Position.z + room.Size.z;
         }
 
         /// <summary>

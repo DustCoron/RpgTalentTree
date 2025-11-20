@@ -80,30 +80,121 @@ namespace RpgTalentTree.Core.Dungeon
         }
 
         /// <summary>
-        /// Create walls around the room using ProBuilder
+        /// Create walls around the room using ProBuilder with doorway cuts
         /// </summary>
         private void CreateWalls(GameObject parent, DungeonRoom room)
         {
-            // Create four walls
-            CreateWall(parent, "Wall_North",
+            // Create four walls with doorways
+            CreateWallWithDoorways(parent, room, Doorway.WallSide.North,
                 new Vector3(0, 0, room.Size.z),
-                new Vector3(room.Size.x, 0, room.Size.z + wallThickness),
-                wallHeight);
+                new Vector3(room.Size.x, 0, room.Size.z + wallThickness));
 
-            CreateWall(parent, "Wall_South",
+            CreateWallWithDoorways(parent, room, Doorway.WallSide.South,
                 new Vector3(0, 0, -wallThickness),
-                new Vector3(room.Size.x, 0, 0),
-                wallHeight);
+                new Vector3(room.Size.x, 0, 0));
 
-            CreateWall(parent, "Wall_East",
+            CreateWallWithDoorways(parent, room, Doorway.WallSide.East,
                 new Vector3(room.Size.x, 0, 0),
-                new Vector3(room.Size.x + wallThickness, 0, room.Size.z),
-                wallHeight);
+                new Vector3(room.Size.x + wallThickness, 0, room.Size.z));
 
-            CreateWall(parent, "Wall_West",
+            CreateWallWithDoorways(parent, room, Doorway.WallSide.West,
                 new Vector3(-wallThickness, 0, 0),
-                new Vector3(0, 0, room.Size.z),
-                wallHeight);
+                new Vector3(0, 0, room.Size.z));
+        }
+
+        /// <summary>
+        /// Create a wall with doorway cuts
+        /// </summary>
+        private void CreateWallWithDoorways(GameObject parent, DungeonRoom room, Doorway.WallSide wallSide, Vector3 corner1, Vector3 corner2)
+        {
+            // Get all doorways for this wall
+            var doorways = room.Doorways.FindAll(d => d.Wall == wallSide);
+
+            if (doorways.Count == 0)
+            {
+                // No doorways, create full wall
+                CreateWall(parent, $"Wall_{wallSide}", corner1, corner2, wallHeight);
+                return;
+            }
+
+            // Sort doorways along the wall
+            doorways.Sort((a, b) =>
+            {
+                float posA = GetDoorwayPositionAlongWall(a, wallSide);
+                float posB = GetDoorwayPositionAlongWall(b, wallSide);
+                return posA.CompareTo(posB);
+            });
+
+            // Determine wall direction and length
+            bool isHorizontal = wallSide == Doorway.WallSide.North || wallSide == Doorway.WallSide.South;
+            float wallLength = isHorizontal ? Mathf.Abs(corner2.x - corner1.x) : Mathf.Abs(corner2.z - corner1.z);
+
+            // Create wall segments between doorways
+            float currentPos = 0f;
+            int segmentIndex = 0;
+
+            foreach (var doorway in doorways)
+            {
+                float doorwayPos = GetDoorwayPositionAlongWall(doorway, wallSide);
+                float doorwayHalfWidth = doorway.Width / 2f;
+                float doorwayStart = Mathf.Max(0, doorwayPos - doorwayHalfWidth);
+                float doorwayEnd = Mathf.Min(wallLength, doorwayPos + doorwayHalfWidth);
+
+                // Create wall segment before doorway
+                if (doorwayStart > currentPos + 0.1f)
+                {
+                    CreateWallSegment(parent, wallSide, corner1, corner2, currentPos, doorwayStart, segmentIndex++);
+                }
+
+                currentPos = doorwayEnd;
+            }
+
+            // Create final wall segment after last doorway
+            if (currentPos < wallLength - 0.1f)
+            {
+                CreateWallSegment(parent, wallSide, corner1, corner2, currentPos, wallLength, segmentIndex);
+            }
+        }
+
+        /// <summary>
+        /// Get doorway position along the wall (0 to wall length)
+        /// </summary>
+        private float GetDoorwayPositionAlongWall(Doorway doorway, Doorway.WallSide wallSide)
+        {
+            switch (wallSide)
+            {
+                case Doorway.WallSide.North:
+                case Doorway.WallSide.South:
+                    return doorway.Position.x;
+                case Doorway.WallSide.East:
+                case Doorway.WallSide.West:
+                    return doorway.Position.z;
+                default:
+                    return 0f;
+            }
+        }
+
+        /// <summary>
+        /// Create a wall segment between two positions along the wall
+        /// </summary>
+        private void CreateWallSegment(GameObject parent, Doorway.WallSide wallSide, Vector3 corner1, Vector3 corner2, float startPos, float endPos, int segmentIndex)
+        {
+            bool isHorizontal = wallSide == Doorway.WallSide.North || wallSide == Doorway.WallSide.South;
+
+            Vector3 segmentCorner1, segmentCorner2;
+
+            if (isHorizontal)
+            {
+                segmentCorner1 = new Vector3(corner1.x + startPos, corner1.y, corner1.z);
+                segmentCorner2 = new Vector3(corner1.x + endPos, corner2.y, corner2.z);
+            }
+            else
+            {
+                segmentCorner1 = new Vector3(corner1.x, corner1.y, corner1.z + startPos);
+                segmentCorner2 = new Vector3(corner2.x, corner2.y, corner1.z + endPos);
+            }
+
+            CreateWall(parent, $"Wall_{wallSide}_Segment{segmentIndex}", segmentCorner1, segmentCorner2, wallHeight);
         }
 
         /// <summary>
