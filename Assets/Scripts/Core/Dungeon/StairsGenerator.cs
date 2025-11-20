@@ -85,7 +85,7 @@ namespace RpgTalentTree.Core.Dungeon
 
             // Calculate step dimensions
             // The step should be tall enough to reach the next step
-            float stepTotalHeight = goingUp ? (stepHeight * (parent.childCount - stepIndex + 1)) : stepHeight;
+            float stepTotalHeight = goingUp ? (stepHeight * (parent.transform.childCount - stepIndex + 1)) : stepHeight;
 
             // Create step as a box - define the base polygon
             float halfWidth = stepWidth / 2f;
