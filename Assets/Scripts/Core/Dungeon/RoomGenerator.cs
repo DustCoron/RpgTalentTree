@@ -62,8 +62,8 @@ namespace RpgTalentTree.Core.Dungeon
                 new Vector3(0, 0, room.Size.z)
             };
 
-            // Create face (two triangles forming a quad)
-            Face face = new Face(new int[] { 0, 1, 2, 0, 2, 3 });
+            // Create face (counter-clockwise winding for upward-facing normals)
+            Face face = new Face(new int[] { 0, 3, 2, 0, 2, 1 });
 
             ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices, new Face[] { face });
             pbMesh.gameObject.transform.SetParent(floorObj.transform);

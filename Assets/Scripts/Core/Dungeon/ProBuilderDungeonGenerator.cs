@@ -266,16 +266,19 @@ namespace RpgTalentTree.Core.Dungeon
             // Create L-shaped corridor (horizontal then vertical)
             Vector3 cornerPos = new Vector3(endPos.x, startPos.y, startPos.z);
 
-            // Add doorways where corridors meet rooms
+            // Find doorway positions on room boundaries
             Vector3 doorwayA = FindRoomBoundaryIntersection(roomA, startPos, cornerPos);
             roomA.AddDoorway(doorwayA, corridorWidth);
 
             Vector3 doorwayB = FindRoomBoundaryIntersection(roomB, endPos, cornerPos);
             roomB.AddDoorway(doorwayB, corridorWidth);
 
-            // Create corridors
-            CreateCorridor(startPos, cornerPos, corridorIndex, "Horizontal");
-            CreateCorridor(cornerPos, endPos, corridorIndex, "Vertical");
+            // Calculate corridor corner position
+            Vector3 corridorCorner = new Vector3(doorwayB.x, doorwayA.y, doorwayA.z);
+
+            // Create corridors from doorway to doorway
+            CreateCorridor(doorwayA, corridorCorner, corridorIndex, "Horizontal");
+            CreateCorridor(corridorCorner, doorwayB, corridorIndex, "Vertical");
         }
 
         /// <summary>
@@ -283,30 +286,29 @@ namespace RpgTalentTree.Core.Dungeon
         /// </summary>
         private void ConnectRoomsWithStairs(DungeonRoom roomA, DungeonRoom roomB, int corridorIndex, Vector3 startPos, Vector3 endPos)
         {
-            // Create horizontal corridor at lower level
+            // Calculate midpoint for stairs location
             Vector3 midPoint = new Vector3((startPos.x + endPos.x) / 2f, startPos.y, (startPos.z + endPos.z) / 2f);
+            Vector3 stairsStart = new Vector3(midPoint.x, startPos.y, midPoint.z);
+            Vector3 stairsEnd = new Vector3(midPoint.x, endPos.y, midPoint.z);
 
-            // Find doorway for roomA
-            Vector3 doorwayA = FindRoomBoundaryIntersection(roomA, startPos, midPoint);
+            // Find doorway positions for both rooms
+            Vector3 doorwayA = FindRoomBoundaryIntersection(roomA, startPos, stairsStart);
             roomA.AddDoorway(doorwayA, corridorWidth);
 
-            // Create corridor from roomA to stairs start
-            Vector3 stairsStart = new Vector3(midPoint.x, startPos.y, midPoint.z);
-            CreateCorridor(startPos, stairsStart, corridorIndex, "ToStairs");
+            Vector3 doorwayB = FindRoomBoundaryIntersection(roomB, endPos, stairsEnd);
+            roomB.AddDoorway(doorwayB, corridorWidth);
+
+            // Create corridor from roomA doorway to stairs start
+            CreateCorridor(doorwayA, stairsStart, corridorIndex, "ToStairs");
 
             // Create stairs from lower to higher level
-            Vector3 stairsEnd = new Vector3(midPoint.x, endPos.y, midPoint.z);
             if (stairsGenerator != null)
             {
                 stairsGenerator.CreateStairs(stairsStart, stairsEnd, dungeonParent.transform, corridorIndex);
             }
 
-            // Find doorway for roomB
-            Vector3 doorwayB = FindRoomBoundaryIntersection(roomB, endPos, stairsEnd);
-            roomB.AddDoorway(doorwayB, corridorWidth);
-
-            // Create corridor from stairs end to roomB
-            CreateCorridor(stairsEnd, endPos, corridorIndex, "FromStairs");
+            // Create corridor from stairs end to roomB doorway
+            CreateCorridor(stairsEnd, doorwayB, corridorIndex, "FromStairs");
         }
 
         /// <summary>
