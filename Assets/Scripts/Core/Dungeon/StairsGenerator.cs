@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEngine.ProBuilder;
-using UnityEngine.ProBuilder.Shapes;
 
 namespace RpgTalentTree.Core.Dungeon
 {
@@ -91,12 +90,21 @@ namespace RpgTalentTree.Core.Dungeon
             // The step should be tall enough to reach the next step
             float stepTotalHeight = goingUp ? (stepHeight * (pbMesh.transform.parent.childCount - stepIndex)) : stepHeight;
 
-            // Create step as a box
-            Vector3 stepSize = new Vector3(stepWidth, stepTotalHeight, stepDepth);
-            pbMesh.CreateShapeFromPolygon(ShapeGenerator.GeneratePlane(PivotLocation.FirstCorner, stepSize.x, stepSize.z, 0, 0, Axis.Up), stepTotalHeight, false);
+            // Create step as a box - define the base polygon
+            float halfWidth = stepWidth / 2f;
+            pbMesh.CreateShapeFromPolygon(
+                new Vector3[] {
+                    new Vector3(-halfWidth, 0, 0),
+                    new Vector3(halfWidth, 0, 0),
+                    new Vector3(halfWidth, 0, stepDepth),
+                    new Vector3(-halfWidth, 0, stepDepth)
+                },
+                stepTotalHeight,
+                false
+            );
 
             // Adjust for proper orientation
-            AdjustStepOrientation(pbMesh, direction, stepSize);
+            AdjustStepOrientation(pbMesh, direction, new Vector3(stepWidth, stepTotalHeight, stepDepth));
 
             // Apply material
             if (stairMaterial != null)
