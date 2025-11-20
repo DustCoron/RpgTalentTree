@@ -44,6 +44,7 @@ namespace RpgTalentTree.Core.Dungeon
         private System.Random random;
         private RoomGenerator roomGenerator;
         private StairsGenerator stairsGenerator;
+        private CorridorGenerator corridorGenerator;
 
         private void Start()
         {
@@ -97,6 +98,10 @@ namespace RpgTalentTree.Core.Dungeon
             // Initialize stairs generator
             Material stairMat = stairMaterial != null ? stairMaterial : floorMaterial;
             stairsGenerator = new StairsGenerator(stairMat, stepHeight, stepDepth, corridorWidth);
+
+            // Initialize corridor generator
+            Material corridorFloorMat = corridorMaterial != null ? corridorMaterial : floorMaterial;
+            corridorGenerator = new CorridorGenerator(corridorFloorMat, wallMaterial, floorMaterial, wallHeight, corridorWidth);
         }
 
         /// <summary>
@@ -163,19 +168,71 @@ namespace RpgTalentTree.Core.Dungeon
 
         /// <summary>
         /// Generate corridors connecting rooms and add doorways
+        /// Uses minimum spanning tree to ensure all rooms are connected
         /// </summary>
         private void GenerateCorridorsAndDoorways()
         {
-            for (int i = 0; i < rooms.Count - 1; i++)
+            if (rooms.Count < 2)
+                return;
+
+            // Track which rooms are connected
+            bool[] connected = new bool[rooms.Count];
+            connected[0] = true;
+
+            int connectedCount = 1;
+            int corridorIndex = 0;
+
+            // Minimum Spanning Tree approach: connect closest unconnected room to the connected set
+            while (connectedCount < rooms.Count)
             {
-                ConnectRooms(rooms[i], rooms[i + 1], i);
+                float minDistance = float.MaxValue;
+                int bestConnectedRoom = -1;
+                int bestUnconnectedRoom = -1;
+
+                // Find the closest pair between connected and unconnected rooms
+                for (int i = 0; i < rooms.Count; i++)
+                {
+                    if (!connected[i]) continue;
+
+                    for (int j = 0; j < rooms.Count; j++)
+                    {
+                        if (connected[j]) continue;
+
+                        float distance = Vector3.Distance(rooms[i].GetCenter(), rooms[j].GetCenter());
+                        if (distance < minDistance)
+                        {
+                            minDistance = distance;
+                            bestConnectedRoom = i;
+                            bestUnconnectedRoom = j;
+                        }
+                    }
+                }
+
+                // Connect the best pair
+                if (bestUnconnectedRoom >= 0)
+                {
+                    ConnectRooms(rooms[bestConnectedRoom], rooms[bestUnconnectedRoom], corridorIndex++);
+                    connected[bestUnconnectedRoom] = true;
+                    connectedCount++;
+                }
             }
 
-            // Optionally connect first and last room to create a loop
-            if (rooms.Count > 2)
+            // Add extra connections for loops (10% chance per pair of nearby rooms)
+            for (int i = 0; i < rooms.Count; i++)
             {
-                ConnectRooms(rooms[rooms.Count - 1], rooms[0], rooms.Count - 1);
+                for (int j = i + 1; j < rooms.Count; j++)
+                {
+                    float distance = Vector3.Distance(rooms[i].GetCenter(), rooms[j].GetCenter());
+
+                    // Only consider nearby rooms for extra connections
+                    if (distance < (gridSpread * 0.5f) && random.NextDouble() < 0.1)
+                    {
+                        ConnectRooms(rooms[i], rooms[j], corridorIndex++);
+                    }
+                }
             }
+
+            Debug.Log($"Created {corridorIndex} corridor connections");
         }
 
         /// <summary>
@@ -292,118 +349,11 @@ namespace RpgTalentTree.Core.Dungeon
         }
 
         /// <summary>
-        /// Create a corridor segment between two points
+        /// Create a corridor segment between two points using CorridorGenerator
         /// </summary>
         private void CreateCorridor(Vector3 start, Vector3 end, int corridorIndex, string direction)
         {
-            if (Vector3.Distance(start, end) < 0.1f)
-                return;
-
-            GameObject corridorObj = new GameObject($"Corridor_{corridorIndex}_{direction}");
-            corridorObj.transform.SetParent(dungeonParent.transform);
-
-            Vector3 dir = (end - start).normalized;
-            float distance = Vector3.Distance(start, end);
-
-            // Calculate corridor dimensions
-            Vector3 localStart = start;
-            Vector3 localEnd = end;
-
-            // Create floor
-            GameObject floorObj = new GameObject("Floor");
-            floorObj.transform.SetParent(corridorObj.transform);
-            floorObj.transform.position = localStart;
-
-            ProBuilderMesh pbMesh = floorObj.AddComponent<ProBuilderMesh>();
-
-            // Determine corridor orientation and create appropriate polygon
-            Vector3[] polygonPoints;
-            if (Mathf.Abs(dir.x) > Mathf.Abs(dir.z))
-            {
-                // Horizontal corridor
-                float halfWidth = corridorWidth / 2f;
-                polygonPoints = new Vector3[] {
-                    new Vector3(0, 0, -halfWidth),
-                    new Vector3(distance, 0, -halfWidth),
-                    new Vector3(distance, 0, halfWidth),
-                    new Vector3(0, 0, halfWidth)
-                };
-            }
-            else
-            {
-                // Vertical corridor
-                float halfWidth = corridorWidth / 2f;
-                polygonPoints = new Vector3[] {
-                    new Vector3(-halfWidth, 0, 0),
-                    new Vector3(halfWidth, 0, 0),
-                    new Vector3(halfWidth, 0, distance),
-                    new Vector3(-halfWidth, 0, distance)
-                };
-            }
-
-            pbMesh.CreateShapeFromPolygon(polygonPoints, 0f, false);
-
-            // Apply material
-            if (corridorMaterial != null || floorMaterial != null)
-            {
-                var renderer = floorObj.GetComponent<MeshRenderer>();
-                if (renderer != null)
-                {
-                    renderer.sharedMaterial = corridorMaterial != null ? corridorMaterial : floorMaterial;
-                }
-            }
-
-            pbMesh.ToMesh();
-            pbMesh.Refresh();
-
-            // Create corridor walls (optional - you can add this if needed)
-            CreateCorridorWalls(corridorObj, polygonPoints, wallHeight);
-        }
-
-        /// <summary>
-        /// Create walls for a corridor
-        /// </summary>
-        private void CreateCorridorWalls(GameObject parent, Vector3[] floorPoints, float height)
-        {
-            // Left wall
-            CreateCorridorWallSegment(parent, "Wall_Left",
-                floorPoints[0], floorPoints[3], height);
-
-            // Right wall
-            CreateCorridorWallSegment(parent, "Wall_Right",
-                floorPoints[1], floorPoints[2], height);
-        }
-
-        /// <summary>
-        /// Create a single corridor wall segment
-        /// </summary>
-        private void CreateCorridorWallSegment(GameObject parent, string name, Vector3 start, Vector3 end, float height)
-        {
-            GameObject wallObj = new GameObject(name);
-            wallObj.transform.SetParent(parent.transform);
-            wallObj.transform.localPosition = Vector3.zero;
-
-            ProBuilderMesh pbMesh = wallObj.AddComponent<ProBuilderMesh>();
-
-            // Create wall polygon
-            pbMesh.CreateShapeFromPolygon(
-                new Vector3[] { start, end },
-                height,
-                false
-            );
-
-            // Apply material
-            if (wallMaterial != null)
-            {
-                var renderer = wallObj.GetComponent<MeshRenderer>();
-                if (renderer != null)
-                {
-                    renderer.sharedMaterial = wallMaterial;
-                }
-            }
-
-            pbMesh.ToMesh();
-            pbMesh.Refresh();
+            corridorGenerator.CreateCorridor(start, end, dungeonParent.transform, corridorIndex, direction);
         }
 
         private void OnValidate()
