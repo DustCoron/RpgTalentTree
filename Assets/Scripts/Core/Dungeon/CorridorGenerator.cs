@@ -61,15 +61,13 @@ namespace RpgTalentTree.Core.Dungeon
             floorObj.transform.SetParent(parent.transform);
             floorObj.transform.position = start;
 
-            ProBuilderMesh pbMesh = floorObj.AddComponent<ProBuilderMesh>();
-
-            Vector3[] polygonPoints;
+            Vector3[] vertices;
             float halfWidth = corridorWidth / 2f;
 
             if (isHorizontalX)
             {
                 // Horizontal corridor (along X axis)
-                polygonPoints = new Vector3[] {
+                vertices = new Vector3[] {
                     new Vector3(0, 0, -halfWidth),
                     new Vector3(distance, 0, -halfWidth),
                     new Vector3(distance, 0, halfWidth),
@@ -79,7 +77,7 @@ namespace RpgTalentTree.Core.Dungeon
             else
             {
                 // Vertical corridor (along Z axis)
-                polygonPoints = new Vector3[] {
+                vertices = new Vector3[] {
                     new Vector3(-halfWidth, 0, 0),
                     new Vector3(halfWidth, 0, 0),
                     new Vector3(halfWidth, 0, distance),
@@ -87,12 +85,18 @@ namespace RpgTalentTree.Core.Dungeon
                 };
             }
 
-            pbMesh.CreateShapeFromPolygon(polygonPoints, 0f, false);
+            // Create face (two triangles forming a quad)
+            Face face = new Face(new int[] { 0, 1, 2, 0, 2, 3 });
+
+            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices, new Face[] { face });
+            pbMesh.gameObject.transform.SetParent(floorObj.transform);
+            pbMesh.gameObject.transform.localPosition = Vector3.zero;
+            pbMesh.gameObject.name = "FloorMesh";
 
             // Apply material
             if (floorMaterial != null)
             {
-                var renderer = floorObj.GetComponent<MeshRenderer>();
+                var renderer = pbMesh.GetComponent<MeshRenderer>();
                 if (renderer != null)
                 {
                     renderer.sharedMaterial = floorMaterial;
@@ -149,28 +153,58 @@ namespace RpgTalentTree.Core.Dungeon
             wallObj.transform.SetParent(parent.transform);
             wallObj.transform.position = worldStart;
 
-            ProBuilderMesh pbMesh = wallObj.AddComponent<ProBuilderMesh>();
-
             // Create wall polygon with 4 corners (a thin rectangle)
             float wallThickness = 0.1f;
             Vector3 direction = (localEnd - localStart).normalized;
             Vector3 perpendicular = new Vector3(-direction.z, 0, direction.x) * wallThickness;
 
-            pbMesh.CreateShapeFromPolygon(
-                new Vector3[] {
-                    localStart,
-                    localStart + perpendicular,
-                    localEnd + perpendicular,
-                    localEnd
-                },
-                wallHeight,
-                false
-            );
+            // Define base rectangle vertices
+            Vector3 v0 = localStart;
+            Vector3 v1 = localStart + perpendicular;
+            Vector3 v2 = localEnd + perpendicular;
+            Vector3 v3 = localEnd;
+
+            // Create all 8 vertices (4 bottom + 4 top)
+            Vector3[] vertices = new Vector3[]
+            {
+                // Bottom vertices (0-3)
+                v0,
+                v1,
+                v2,
+                v3,
+                // Top vertices (4-7)
+                v0 + Vector3.up * wallHeight,
+                v1 + Vector3.up * wallHeight,
+                v2 + Vector3.up * wallHeight,
+                v3 + Vector3.up * wallHeight
+            };
+
+            // Define faces (6 faces, each as 2 triangles)
+            Face[] faces = new Face[]
+            {
+                // Bottom face (facing down)
+                new Face(new int[] { 0, 2, 1, 0, 3, 2 }),
+                // Top face (facing up)
+                new Face(new int[] { 4, 5, 6, 4, 6, 7 }),
+                // Front face
+                new Face(new int[] { 0, 1, 5, 0, 5, 4 }),
+                // Right face
+                new Face(new int[] { 1, 2, 6, 1, 6, 5 }),
+                // Back face
+                new Face(new int[] { 2, 3, 7, 2, 7, 6 }),
+                // Left face
+                new Face(new int[] { 3, 0, 4, 3, 4, 7 })
+            };
+
+            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices, faces);
+            pbMesh.gameObject.transform.SetParent(wallObj.transform);
+            pbMesh.gameObject.transform.localPosition = Vector3.zero;
+            pbMesh.gameObject.name = name + "_Mesh";
 
             // Apply material
             if (wallMaterial != null)
             {
-                var renderer = wallObj.GetComponent<MeshRenderer>();
+                var renderer = pbMesh.GetComponent<MeshRenderer>();
                 if (renderer != null)
                 {
                     renderer.sharedMaterial = wallMaterial;
@@ -190,15 +224,13 @@ namespace RpgTalentTree.Core.Dungeon
             ceilingObj.transform.SetParent(parent.transform);
             ceilingObj.transform.position = start + Vector3.up * wallHeight;
 
-            ProBuilderMesh pbMesh = ceilingObj.AddComponent<ProBuilderMesh>();
-
-            Vector3[] polygonPoints;
+            Vector3[] vertices;
             float halfWidth = corridorWidth / 2f;
 
             if (isHorizontalX)
             {
                 // Horizontal corridor ceiling
-                polygonPoints = new Vector3[] {
+                vertices = new Vector3[] {
                     new Vector3(0, 0, halfWidth),
                     new Vector3(distance, 0, halfWidth),
                     new Vector3(distance, 0, -halfWidth),
@@ -208,7 +240,7 @@ namespace RpgTalentTree.Core.Dungeon
             else
             {
                 // Vertical corridor ceiling
-                polygonPoints = new Vector3[] {
+                vertices = new Vector3[] {
                     new Vector3(halfWidth, 0, 0),
                     new Vector3(halfWidth, 0, distance),
                     new Vector3(-halfWidth, 0, distance),
@@ -216,13 +248,18 @@ namespace RpgTalentTree.Core.Dungeon
                 };
             }
 
-            // Ceiling faces downward, so flip normals
-            pbMesh.CreateShapeFromPolygon(polygonPoints, 0f, true);
+            // Create face with reversed winding for ceiling (faces down)
+            Face face = new Face(new int[] { 0, 2, 1, 0, 3, 2 });
+
+            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices, new Face[] { face });
+            pbMesh.gameObject.transform.SetParent(ceilingObj.transform);
+            pbMesh.gameObject.transform.localPosition = Vector3.zero;
+            pbMesh.gameObject.name = "CeilingMesh";
 
             // Apply material
             if (ceilingMaterial != null)
             {
-                var renderer = ceilingObj.GetComponent<MeshRenderer>();
+                var renderer = pbMesh.GetComponent<MeshRenderer>();
                 if (renderer != null)
                 {
                     renderer.sharedMaterial = ceilingMaterial;

@@ -53,24 +53,27 @@ namespace RpgTalentTree.Core.Dungeon
             floorObj.transform.SetParent(parent.transform);
             floorObj.transform.localPosition = Vector3.zero;
 
-            ProBuilderMesh pbMesh = floorObj.AddComponent<ProBuilderMesh>();
+            // Create floor vertices
+            Vector3[] vertices = new Vector3[]
+            {
+                new Vector3(0, 0, 0),
+                new Vector3(room.Size.x, 0, 0),
+                new Vector3(room.Size.x, 0, room.Size.z),
+                new Vector3(0, 0, room.Size.z)
+            };
 
-            // Create a plane shape
-            pbMesh.CreateShapeFromPolygon(
-                new Vector3[] {
-                    new Vector3(0, 0, 0),
-                    new Vector3(room.Size.x, 0, 0),
-                    new Vector3(room.Size.x, 0, room.Size.z),
-                    new Vector3(0, 0, room.Size.z)
-                },
-                0f, // extrusion height
-                false // flip normals
-            );
+            // Create face (two triangles forming a quad)
+            Face face = new Face(new int[] { 0, 1, 2, 0, 2, 3 });
+
+            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices, new Face[] { face });
+            pbMesh.gameObject.transform.SetParent(floorObj.transform);
+            pbMesh.gameObject.transform.localPosition = Vector3.zero;
+            pbMesh.gameObject.name = "FloorMesh";
 
             // Apply material
             if (floorMaterial != null)
             {
-                var renderer = floorObj.GetComponent<MeshRenderer>();
+                var renderer = pbMesh.GetComponent<MeshRenderer>();
                 if (renderer != null)
                 {
                     renderer.sharedMaterial = floorMaterial;
@@ -98,24 +101,27 @@ namespace RpgTalentTree.Core.Dungeon
             ceilingObj.transform.SetParent(parent.transform);
             ceilingObj.transform.localPosition = new Vector3(0, wallHeight, 0);
 
-            ProBuilderMesh pbMesh = ceilingObj.AddComponent<ProBuilderMesh>();
+            // Create ceiling vertices (inverted winding order for downward-facing normals)
+            Vector3[] vertices = new Vector3[]
+            {
+                new Vector3(0, 0, 0),
+                new Vector3(room.Size.x, 0, 0),
+                new Vector3(room.Size.x, 0, room.Size.z),
+                new Vector3(0, 0, room.Size.z)
+            };
 
-            // Create a plane shape (inverted normals for ceiling)
-            pbMesh.CreateShapeFromPolygon(
-                new Vector3[] {
-                    new Vector3(0, 0, room.Size.z),
-                    new Vector3(room.Size.x, 0, room.Size.z),
-                    new Vector3(room.Size.x, 0, 0),
-                    new Vector3(0, 0, 0)
-                },
-                0f, // extrusion height
-                true // flip normals (ceiling faces down)
-            );
+            // Create face with reversed winding for ceiling (faces down)
+            Face face = new Face(new int[] { 0, 2, 1, 0, 3, 2 });
+
+            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices, new Face[] { face });
+            pbMesh.gameObject.transform.SetParent(ceilingObj.transform);
+            pbMesh.gameObject.transform.localPosition = Vector3.zero;
+            pbMesh.gameObject.name = "CeilingMesh";
 
             // Apply material
             if (floorMaterial != null)
             {
-                var renderer = ceilingObj.GetComponent<MeshRenderer>();
+                var renderer = pbMesh.GetComponent<MeshRenderer>();
                 if (renderer != null)
                 {
                     renderer.sharedMaterial = floorMaterial;

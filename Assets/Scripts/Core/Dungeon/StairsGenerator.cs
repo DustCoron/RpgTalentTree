@@ -83,25 +83,52 @@ namespace RpgTalentTree.Core.Dungeon
             );
             stepObj.transform.localPosition = stepPosition;
 
-            // Create ProBuilder mesh for the step
-            ProBuilderMesh pbMesh = stepObj.AddComponent<ProBuilderMesh>();
-
             // Calculate step dimensions
             // The step should be tall enough to reach the next step
-            float stepTotalHeight = goingUp ? (stepHeight * (pbMesh.transform.parent.childCount - stepIndex)) : stepHeight;
+            float stepTotalHeight = goingUp ? (stepHeight * (parent.childCount - stepIndex + 1)) : stepHeight;
 
             // Create step as a box - define the base polygon
             float halfWidth = stepWidth / 2f;
-            pbMesh.CreateShapeFromPolygon(
-                new Vector3[] {
-                    new Vector3(-halfWidth, 0, 0),
-                    new Vector3(halfWidth, 0, 0),
-                    new Vector3(halfWidth, 0, stepDepth),
-                    new Vector3(-halfWidth, 0, stepDepth)
-                },
-                stepTotalHeight,
-                false
-            );
+
+            // Define base rectangle vertices
+            Vector3 v0 = new Vector3(-halfWidth, 0, 0);
+            Vector3 v1 = new Vector3(halfWidth, 0, 0);
+            Vector3 v2 = new Vector3(halfWidth, 0, stepDepth);
+            Vector3 v3 = new Vector3(-halfWidth, 0, stepDepth);
+
+            // Create all 8 vertices (4 bottom + 4 top)
+            Vector3[] vertices = new Vector3[]
+            {
+                // Bottom vertices (0-3)
+                v0, v1, v2, v3,
+                // Top vertices (4-7)
+                v0 + Vector3.up * stepTotalHeight,
+                v1 + Vector3.up * stepTotalHeight,
+                v2 + Vector3.up * stepTotalHeight,
+                v3 + Vector3.up * stepTotalHeight
+            };
+
+            // Define faces (6 faces, each as 2 triangles)
+            Face[] faces = new Face[]
+            {
+                // Bottom face (facing down)
+                new Face(new int[] { 0, 2, 1, 0, 3, 2 }),
+                // Top face (facing up)
+                new Face(new int[] { 4, 5, 6, 4, 6, 7 }),
+                // Front face
+                new Face(new int[] { 0, 1, 5, 0, 5, 4 }),
+                // Right face
+                new Face(new int[] { 1, 2, 6, 1, 6, 5 }),
+                // Back face
+                new Face(new int[] { 2, 3, 7, 2, 7, 6 }),
+                // Left face
+                new Face(new int[] { 3, 0, 4, 3, 4, 7 })
+            };
+
+            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices, faces);
+            pbMesh.gameObject.transform.SetParent(stepObj.transform);
+            pbMesh.gameObject.transform.localPosition = Vector3.zero;
+            pbMesh.gameObject.name = $"Step_{stepIndex}_Mesh";
 
             // Adjust for proper orientation
             AdjustStepOrientation(pbMesh, direction, new Vector3(stepWidth, stepTotalHeight, stepDepth));
@@ -109,7 +136,7 @@ namespace RpgTalentTree.Core.Dungeon
             // Apply material
             if (stairMaterial != null)
             {
-                var renderer = stepObj.GetComponent<MeshRenderer>();
+                var renderer = pbMesh.GetComponent<MeshRenderer>();
                 if (renderer != null)
                 {
                     renderer.sharedMaterial = stairMaterial;
@@ -186,25 +213,54 @@ namespace RpgTalentTree.Core.Dungeon
             postObj.transform.SetParent(parent.transform);
             postObj.transform.localPosition = position;
 
-            ProBuilderMesh pbMesh = postObj.AddComponent<ProBuilderMesh>();
-
             // Create thin vertical post
             float postThickness = 0.1f;
-            pbMesh.CreateShapeFromPolygon(
-                new Vector3[] {
-                    new Vector3(-postThickness / 2, 0, -postThickness / 2),
-                    new Vector3(postThickness / 2, 0, -postThickness / 2),
-                    new Vector3(postThickness / 2, 0, postThickness / 2),
-                    new Vector3(-postThickness / 2, 0, postThickness / 2)
-                },
-                height,
-                false
-            );
+            float halfThickness = postThickness / 2f;
+
+            // Define base square vertices
+            Vector3 v0 = new Vector3(-halfThickness, 0, -halfThickness);
+            Vector3 v1 = new Vector3(halfThickness, 0, -halfThickness);
+            Vector3 v2 = new Vector3(halfThickness, 0, halfThickness);
+            Vector3 v3 = new Vector3(-halfThickness, 0, halfThickness);
+
+            // Create all 8 vertices (4 bottom + 4 top)
+            Vector3[] vertices = new Vector3[]
+            {
+                // Bottom vertices (0-3)
+                v0, v1, v2, v3,
+                // Top vertices (4-7)
+                v0 + Vector3.up * height,
+                v1 + Vector3.up * height,
+                v2 + Vector3.up * height,
+                v3 + Vector3.up * height
+            };
+
+            // Define faces (6 faces, each as 2 triangles)
+            Face[] faces = new Face[]
+            {
+                // Bottom face (facing down)
+                new Face(new int[] { 0, 2, 1, 0, 3, 2 }),
+                // Top face (facing up)
+                new Face(new int[] { 4, 5, 6, 4, 6, 7 }),
+                // Front face
+                new Face(new int[] { 0, 1, 5, 0, 5, 4 }),
+                // Right face
+                new Face(new int[] { 1, 2, 6, 1, 6, 5 }),
+                // Back face
+                new Face(new int[] { 2, 3, 7, 2, 7, 6 }),
+                // Left face
+                new Face(new int[] { 3, 0, 4, 3, 4, 7 })
+            };
+
+            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices, faces);
+            pbMesh.gameObject.transform.SetParent(postObj.transform);
+            pbMesh.gameObject.transform.localPosition = Vector3.zero;
+            pbMesh.gameObject.name = "PostMesh";
 
             // Apply material
             if (stairMaterial != null)
             {
-                var renderer = postObj.GetComponent<MeshRenderer>();
+                var renderer = pbMesh.GetComponent<MeshRenderer>();
                 if (renderer != null)
                 {
                     renderer.sharedMaterial = stairMaterial;
@@ -224,26 +280,53 @@ namespace RpgTalentTree.Core.Dungeon
             barObj.transform.SetParent(parent.transform);
             barObj.transform.localPosition = start;
 
-            ProBuilderMesh pbMesh = barObj.AddComponent<ProBuilderMesh>();
-
             // Calculate bar direction and length
             Vector3 direction = (end - start);
             float length = direction.magnitude;
             direction.Normalize();
 
             float barThickness = 0.05f;
+            float halfThickness = barThickness / 2f;
 
-            // Create horizontal bar
-            pbMesh.CreateShapeFromPolygon(
-                new Vector3[] {
-                    new Vector3(-barThickness / 2, -barThickness / 2, 0),
-                    new Vector3(barThickness / 2, -barThickness / 2, 0),
-                    new Vector3(barThickness / 2, barThickness / 2, 0),
-                    new Vector3(-barThickness / 2, barThickness / 2, 0)
-                },
-                length,
-                false
-            );
+            // Define base square vertices (perpendicular to bar length)
+            Vector3 v0 = new Vector3(-halfThickness, -halfThickness, 0);
+            Vector3 v1 = new Vector3(halfThickness, -halfThickness, 0);
+            Vector3 v2 = new Vector3(halfThickness, halfThickness, 0);
+            Vector3 v3 = new Vector3(-halfThickness, halfThickness, 0);
+
+            // Create all 8 vertices (4 back + 4 front along length)
+            Vector3[] vertices = new Vector3[]
+            {
+                // Back vertices (0-3)
+                v0, v1, v2, v3,
+                // Front vertices (4-7)
+                v0 + Vector3.forward * length,
+                v1 + Vector3.forward * length,
+                v2 + Vector3.forward * length,
+                v3 + Vector3.forward * length
+            };
+
+            // Define faces (6 faces, each as 2 triangles)
+            Face[] faces = new Face[]
+            {
+                // Back face
+                new Face(new int[] { 0, 2, 1, 0, 3, 2 }),
+                // Front face
+                new Face(new int[] { 4, 5, 6, 4, 6, 7 }),
+                // Bottom face
+                new Face(new int[] { 0, 1, 5, 0, 5, 4 }),
+                // Right face
+                new Face(new int[] { 1, 2, 6, 1, 6, 5 }),
+                // Top face
+                new Face(new int[] { 2, 3, 7, 2, 7, 6 }),
+                // Left face
+                new Face(new int[] { 3, 0, 4, 3, 4, 7 })
+            };
+
+            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices, faces);
+            pbMesh.gameObject.transform.SetParent(barObj.transform);
+            pbMesh.gameObject.transform.localPosition = Vector3.zero;
+            pbMesh.gameObject.name = "BarMesh";
 
             // Rotate to align with direction
             float angle = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg;
@@ -253,7 +336,7 @@ namespace RpgTalentTree.Core.Dungeon
             // Apply material
             if (stairMaterial != null)
             {
-                var renderer = barObj.GetComponent<MeshRenderer>();
+                var renderer = pbMesh.GetComponent<MeshRenderer>();
                 if (renderer != null)
                 {
                     renderer.sharedMaterial = stairMaterial;

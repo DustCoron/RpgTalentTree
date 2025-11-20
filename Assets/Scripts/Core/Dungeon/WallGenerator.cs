@@ -147,24 +147,53 @@ namespace RpgTalentTree.Core.Dungeon
             wallObj.transform.SetParent(parent.transform);
             wallObj.transform.localPosition = Vector3.zero;
 
-            ProBuilderMesh pbMesh = wallObj.AddComponent<ProBuilderMesh>();
+            // Define base rectangle vertices
+            Vector3 v0 = corner1;
+            Vector3 v1 = new Vector3(corner2.x, corner1.y, corner1.z);
+            Vector3 v2 = corner2;
+            Vector3 v3 = new Vector3(corner1.x, corner2.y, corner2.z);
 
-            // Create extruded wall from polygon
-            pbMesh.CreateShapeFromPolygon(
-                new Vector3[] {
-                    corner1,
-                    new Vector3(corner2.x, corner1.y, corner1.z),
-                    corner2,
-                    new Vector3(corner1.x, corner2.y, corner2.z)
-                },
-                height,
-                false
-            );
+            // Create all 8 vertices (4 bottom + 4 top)
+            Vector3[] vertices = new Vector3[]
+            {
+                // Bottom vertices (0-3)
+                v0,
+                v1,
+                v2,
+                v3,
+                // Top vertices (4-7)
+                v0 + Vector3.up * height,
+                v1 + Vector3.up * height,
+                v2 + Vector3.up * height,
+                v3 + Vector3.up * height
+            };
+
+            // Define faces (6 faces, each as 2 triangles)
+            Face[] faces = new Face[]
+            {
+                // Bottom face (facing down)
+                new Face(new int[] { 0, 2, 1, 0, 3, 2 }),
+                // Top face (facing up)
+                new Face(new int[] { 4, 5, 6, 4, 6, 7 }),
+                // Front face
+                new Face(new int[] { 0, 1, 5, 0, 5, 4 }),
+                // Right face
+                new Face(new int[] { 1, 2, 6, 1, 6, 5 }),
+                // Back face
+                new Face(new int[] { 2, 3, 7, 2, 7, 6 }),
+                // Left face
+                new Face(new int[] { 3, 0, 4, 3, 4, 7 })
+            };
+
+            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices, faces);
+            pbMesh.gameObject.transform.SetParent(wallObj.transform);
+            pbMesh.gameObject.transform.localPosition = Vector3.zero;
+            pbMesh.gameObject.name = name + "_Mesh";
 
             // Apply material
             if (wallMaterial != null)
             {
-                var renderer = wallObj.GetComponent<MeshRenderer>();
+                var renderer = pbMesh.GetComponent<MeshRenderer>();
                 if (renderer != null)
                 {
                     renderer.sharedMaterial = wallMaterial;
