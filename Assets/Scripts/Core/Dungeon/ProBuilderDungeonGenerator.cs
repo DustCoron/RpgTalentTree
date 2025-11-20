@@ -11,14 +11,15 @@ namespace RpgTalentTree.Core.Dungeon
     public class ProBuilderDungeonGenerator : MonoBehaviour
     {
         [Header("Dungeon Settings")]
-        [SerializeField] private int roomCount = 10;
+        [SerializeField] private int dungeonWidth = 80;
+        [SerializeField] private int dungeonDepth = 80;
+        [SerializeField] private int bspDepth = 4;
+        [SerializeField] private int minPartitionSize = 12;
         [SerializeField] private Vector2Int minRoomSize = new Vector2Int(4, 4);
         [SerializeField] private Vector2Int maxRoomSize = new Vector2Int(10, 10);
         [SerializeField] private float wallHeight = 3f;
         [SerializeField] private float wallThickness = 0.2f;
         [SerializeField] private int corridorWidth = 2;
-        [SerializeField] private int maxAttempts = 100;
-        [SerializeField] private int gridSpread = 50;
 
         [Header("Materials")]
         [SerializeField] private Material floorMaterial;
@@ -45,6 +46,7 @@ namespace RpgTalentTree.Core.Dungeon
         private RoomGenerator roomGenerator;
         private StairsGenerator stairsGenerator;
         private CorridorGenerator corridorGenerator;
+        private BSPNode bspRoot;
 
         private void Start()
         {
@@ -105,27 +107,23 @@ namespace RpgTalentTree.Core.Dungeon
         }
 
         /// <summary>
-        /// Generate all rooms with random placement
+        /// Generate all rooms using Binary Space Partitioning
         /// </summary>
         private void GenerateRooms()
         {
-            int attempts = 0;
+            // Create root BSP node covering the entire dungeon area
+            Rect dungeonBounds = new Rect(-dungeonWidth / 2f, -dungeonDepth / 2f, dungeonWidth, dungeonDepth);
+            bspRoot = new BSPNode(dungeonBounds);
 
-            while (rooms.Count < roomCount && attempts < maxAttempts)
+            // Recursively split the space
+            SplitBSPNode(bspRoot, 0);
+
+            // Create rooms in leaf nodes
+            List<BSPNode> leaves = new List<BSPNode>();
+            bspRoot.GetLeaves(leaves);
+
+            foreach (var leaf in leaves)
             {
-                attempts++;
-
-                // Generate random room size
-                int width = random.Next(minRoomSize.x, maxRoomSize.x + 1);
-                int depth = random.Next(minRoomSize.y, maxRoomSize.y + 1);
-
-                // Generate random position
-                int x = random.Next(-gridSpread, gridSpread);
-                int z = random.Next(-gridSpread, gridSpread);
-
-                Vector3Int position = new Vector3Int(x, 0, z);
-                Vector3Int size = new Vector3Int(width, (int)wallHeight, depth);
-
                 // Generate random floor height if multi-level is enabled
                 float floorHeight = 0f;
                 if (enableMultiLevel)
@@ -135,23 +133,28 @@ namespace RpgTalentTree.Core.Dungeon
                     floorHeight = minFloorHeight + (randomLevel * floorHeightStep);
                 }
 
-                DungeonRoom newRoom = new DungeonRoom(position, size, floorHeight);
-
-                // Check for overlaps
-                bool overlaps = false;
-                foreach (var existingRoom in rooms)
+                leaf.CreateRoom(random, minRoomSize, maxRoomSize, floorHeight);
+                if (leaf.Room != null)
                 {
-                    if (newRoom.Overlaps(existingRoom, 2))
-                    {
-                        overlaps = true;
-                        break;
-                    }
+                    rooms.Add(leaf.Room);
                 }
+            }
 
-                if (!overlaps)
-                {
-                    rooms.Add(newRoom);
-                }
+            Debug.Log($"BSP generated {rooms.Count} rooms from {leaves.Count} partitions");
+        }
+
+        /// <summary>
+        /// Recursively split BSP node
+        /// </summary>
+        private void SplitBSPNode(BSPNode node, int depth)
+        {
+            if (depth >= bspDepth)
+                return;
+
+            if (node.Split(minPartitionSize, random))
+            {
+                SplitBSPNode(node.LeftChild, depth + 1);
+                SplitBSPNode(node.RightChild, depth + 1);
             }
         }
 
@@ -167,72 +170,72 @@ namespace RpgTalentTree.Core.Dungeon
         }
 
         /// <summary>
-        /// Generate corridors connecting rooms and add doorways
-        /// Uses minimum spanning tree to ensure all rooms are connected
+        /// Generate corridors connecting rooms following BSP tree structure
         /// </summary>
         private void GenerateCorridorsAndDoorways()
         {
-            if (rooms.Count < 2)
+            if (rooms.Count < 2 || bspRoot == null)
                 return;
 
-            // Track which rooms are connected
-            bool[] connected = new bool[rooms.Count];
-            connected[0] = true;
-
-            int connectedCount = 1;
             int corridorIndex = 0;
+            ConnectBSPNodes(bspRoot, ref corridorIndex);
 
-            // Minimum Spanning Tree approach: connect closest unconnected room to the connected set
-            while (connectedCount < rooms.Count)
+            Debug.Log($"Created {corridorIndex} corridor connections using BSP tree");
+        }
+
+        /// <summary>
+        /// Recursively connect rooms in BSP tree
+        /// </summary>
+        private void ConnectBSPNodes(BSPNode node, ref int corridorIndex)
+        {
+            if (node.IsLeaf())
+                return;
+
+            // Recursively connect children first
+            if (node.LeftChild != null)
+                ConnectBSPNodes(node.LeftChild, ref corridorIndex);
+            if (node.RightChild != null)
+                ConnectBSPNodes(node.RightChild, ref corridorIndex);
+
+            // Connect rooms from left and right subtrees
+            if (node.LeftChild != null && node.RightChild != null)
             {
-                float minDistance = float.MaxValue;
-                int bestConnectedRoom = -1;
-                int bestUnconnectedRoom = -1;
+                // Get a random room from each subtree
+                DungeonRoom leftRoom = GetRandomRoomFromNode(node.LeftChild);
+                DungeonRoom rightRoom = GetRandomRoomFromNode(node.RightChild);
 
-                // Find the closest pair between connected and unconnected rooms
-                for (int i = 0; i < rooms.Count; i++)
+                if (leftRoom != null && rightRoom != null)
                 {
-                    if (!connected[i]) continue;
-
-                    for (int j = 0; j < rooms.Count; j++)
-                    {
-                        if (connected[j]) continue;
-
-                        float distance = Vector3.Distance(rooms[i].GetCenter(), rooms[j].GetCenter());
-                        if (distance < minDistance)
-                        {
-                            minDistance = distance;
-                            bestConnectedRoom = i;
-                            bestUnconnectedRoom = j;
-                        }
-                    }
-                }
-
-                // Connect the best pair
-                if (bestUnconnectedRoom >= 0)
-                {
-                    ConnectRooms(rooms[bestConnectedRoom], rooms[bestUnconnectedRoom], corridorIndex++);
-                    connected[bestUnconnectedRoom] = true;
-                    connectedCount++;
+                    ConnectRooms(leftRoom, rightRoom, corridorIndex++);
                 }
             }
+        }
 
-            // Add extra connections for loops (10% chance per pair of nearby rooms)
-            for (int i = 0; i < rooms.Count; i++)
+        /// <summary>
+        /// Get a random room from a BSP node's subtree
+        /// </summary>
+        private DungeonRoom GetRandomRoomFromNode(BSPNode node)
+        {
+            if (node.IsLeaf())
+                return node.Room;
+
+            // Randomly choose left or right subtree
+            if (node.LeftChild != null && node.RightChild != null)
             {
-                for (int j = i + 1; j < rooms.Count; j++)
-                {
-                    float distance = Vector3.Distance(rooms[i].GetCenter(), rooms[j].GetCenter());
-
-                    // Only consider nearby rooms for extra connections
-                    if (distance < (gridSpread * 0.5f) && random.NextDouble() < 0.1)
-                    {
-                        ConnectRooms(rooms[i], rooms[j], corridorIndex++);
-                    }
-                }
+                return random.Next(0, 2) == 0
+                    ? GetRandomRoomFromNode(node.LeftChild)
+                    : GetRandomRoomFromNode(node.RightChild);
+            }
+            else if (node.LeftChild != null)
+            {
+                return GetRandomRoomFromNode(node.LeftChild);
+            }
+            else if (node.RightChild != null)
+            {
+                return GetRandomRoomFromNode(node.RightChild);
             }
 
-            Debug.Log($"Created {corridorIndex} corridor connections");
+            return null;
         }
 
         /// <summary>
@@ -361,7 +364,10 @@ namespace RpgTalentTree.Core.Dungeon
         private void OnValidate()
         {
             // Clamp values
-            roomCount = Mathf.Max(1, roomCount);
+            dungeonWidth = Mathf.Max(20, dungeonWidth);
+            dungeonDepth = Mathf.Max(20, dungeonDepth);
+            bspDepth = Mathf.Clamp(bspDepth, 1, 8);
+            minPartitionSize = Mathf.Max(8, minPartitionSize);
             minRoomSize.x = Mathf.Max(2, minRoomSize.x);
             minRoomSize.y = Mathf.Max(2, minRoomSize.y);
             maxRoomSize.x = Mathf.Max(minRoomSize.x, maxRoomSize.x);
