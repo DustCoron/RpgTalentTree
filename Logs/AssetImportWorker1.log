@@ -15,7 +15,7 @@ C:/WorkFolder/RpgTalentTree
 -logFile
 Logs/AssetImportWorker1.log
 -srvPort
-58750
+58784
 -job-worker-count
 15
 -background-job-worker-count
@@ -59,16 +59,18 @@ C:/WorkFolder/RpgTalentTree
     "memorysetup-temp-allocator-size-gi-baking-worker=262144"
     "memorysetup-temp-allocator-size-gi-baking-worker=262144"
     "memorysetup-temp-allocator-size-gfx=262144"
-Player connection [32600]  Target information:
+Player connection [22612]  Target information:
 
-Player connection [32600]  * "[IP] 192.168.1.115 [Port] 0 [Flags] 2 [Guid] 1032183608 [EditorId] 1032183608 [Version] 1048832 [Id] WindowsEditor(7,Dustik) [Debug] 1 [PackageName] WindowsEditor [ProjectName] Editor" 
+Player connection [22612]  * "[IP] 10.133.140.32 [Port] 0 [Flags] 2 [Guid] 3436397843 [EditorId] 3436397843 [Version] 1048832 [Id] WindowsEditor(7,Dustik) [Debug] 1 [PackageName] WindowsEditor [ProjectName] Editor" 
 
-Player connection [32600] Host joined multi-casting on [225.0.0.222:54997]...
-Player connection [32600] Host joined alternative multi-casting on [225.0.0.222:34997]...
+Player connection [22612]  * "[IP] 192.168.1.2 [Port] 0 [Flags] 2 [Guid] 3436397843 [EditorId] 3436397843 [Version] 1048832 [Id] WindowsEditor(7,Dustik) [Debug] 1 [PackageName] WindowsEditor [ProjectName] Editor" 
+
+Player connection [22612] Host joined multi-casting on [225.0.0.222:54997]...
+Player connection [22612] Host joined alternative multi-casting on [225.0.0.222:34997]...
 JobSystem: Creating JobQueue using job-worker-count value 15
 Library Redirect Path: Library/
 [PhysX] Initialized MultithreadedTaskDispatcher with 16 workers.
-Refreshing native plugins compatible for Editor in 0.34 ms, found 0 plugins.
+Refreshing native plugins compatible for Editor in 0.20 ms, found 0 plugins.
 Preloading 0 native plugins for Editor in 0.00 ms.
 Initialize engine version: 6000.0.3f1 (019aa96b6ed9)
 [Subsystems] Discovering subsystems at path C:/Program Files/Unity/Hub/Editor/6000.0.3f1/Editor/Data/Resources/UnitySubsystems
@@ -84,43 +86,43 @@ Initialize mono
 Mono path[0] = 'C:/Program Files/Unity/Hub/Editor/6000.0.3f1/Editor/Data/Managed'
 Mono path[1] = 'C:/Program Files/Unity/Hub/Editor/6000.0.3f1/Editor/Data/MonoBleedingEdge/lib/mono/unityjit-win32'
 Mono config path = 'C:/Program Files/Unity/Hub/Editor/6000.0.3f1/Editor/Data/MonoBleedingEdge/etc'
-Using monoOptions --debugger-agent=transport=dt_socket,embedding=1,server=y,suspend=n,address=127.0.0.1:56596
+Using monoOptions --debugger-agent=transport=dt_socket,embedding=1,server=y,suspend=n,address=127.0.0.1:56480
 Begin MonoManager ReloadAssembly
 Registering precompiled unity dll's ...
 Register platform support module: C:/Program Files/Unity/Hub/Editor/6000.0.3f1/Editor/Data/PlaybackEngines/WindowsStandaloneSupport/UnityEditor.WindowsStandalone.Extensions.dll
-Registered in 0.002141 seconds.
-- Loaded All Assemblies, in  0.289 seconds
+Registered in 0.001935 seconds.
+- Loaded All Assemblies, in  0.239 seconds
 Native extension for WindowsStandalone target not found
 Mono: successfully reloaded assembly
-- Finished resetting the current domain, in  0.325 seconds
-Domain Reload Profiling: 613ms
-	BeginReloadAssembly (101ms)
+- Finished resetting the current domain, in  0.280 seconds
+Domain Reload Profiling: 518ms
+	BeginReloadAssembly (82ms)
 		ExecutionOrderSort (0ms)
 		DisableScriptedObjects (0ms)
 		BackupInstance (0ms)
 		ReleaseScriptingObjects (0ms)
 		CreateAndSetChildDomain (1ms)
-	RebuildCommonClasses (28ms)
-	RebuildNativeTypeToScriptingClass (9ms)
-	initialDomainReloadingComplete (35ms)
-	LoadAllAssembliesAndSetupDomain (114ms)
-		LoadAssemblies (99ms)
+	RebuildCommonClasses (23ms)
+	RebuildNativeTypeToScriptingClass (7ms)
+	initialDomainReloadingComplete (31ms)
+	LoadAllAssembliesAndSetupDomain (94ms)
+		LoadAssemblies (80ms)
 		RebuildTransferFunctionScriptingTraits (0ms)
-		AnalyzeDomain (112ms)
-			TypeCache.Refresh (111ms)
-				TypeCache.ScanAssembly (102ms)
+		AnalyzeDomain (92ms)
+			TypeCache.Refresh (91ms)
+				TypeCache.ScanAssembly (83ms)
 			BuildScriptInfoCaches (0ms)
 			ResolveRequiredComponents (0ms)
-	FinalizeReload (325ms)
+	FinalizeReload (280ms)
 		ReleaseScriptCaches (0ms)
 		RebuildScriptCaches (0ms)
-		SetupLoadedEditorAssemblies (289ms)
+		SetupLoadedEditorAssemblies (242ms)
 			LogAssemblyErrors (0ms)
-			InitializePlatformSupportModulesInManaged (18ms)
+			InitializePlatformSupportModulesInManaged (16ms)
 			SetLoadedEditorAssemblies (4ms)
-			BeforeProcessingInitializeOnLoad (4ms)
-			ProcessInitializeOnLoadAttributes (118ms)
-			ProcessInitializeOnLoadMethodAttributes (144ms)
+			BeforeProcessingInitializeOnLoad (3ms)
+			ProcessInitializeOnLoadAttributes (97ms)
+			ProcessInitializeOnLoadMethodAttributes (121ms)
 			AfterProcessingInitializeOnLoad (0ms)
 			EditorAssembliesLoaded (0ms)
 		ExecutionOrderSort2 (0ms)
@@ -129,148 +131,111 @@ Domain Reload Profiling: 613ms
 Worker process is ready to serve import requests
 Import Worker Mode flag is 0x00
 Begin MonoManager ReloadAssembly
-- Loaded All Assemblies, in  0.444 seconds
-Refreshing native plugins compatible for Editor in 0.25 ms, found 0 plugins.
+- Loaded All Assemblies, in  0.499 seconds
+Refreshing native plugins compatible for Editor in 0.12 ms, found 0 plugins.
 Native extension for WindowsStandalone target not found
+[MODES] ModeService[none].Initialize
+[MODES] ModeService[none].LoadModes
+[MODES] Loading mode Default (0) for mode-current-id-RpgTalentTree
 Mono: successfully reloaded assembly
-- Finished resetting the current domain, in  0.399 seconds
-Domain Reload Profiling: 841ms
-	BeginReloadAssembly (304ms)
+- Finished resetting the current domain, in  0.452 seconds
+Domain Reload Profiling: 949ms
+	BeginReloadAssembly (253ms)
 		ExecutionOrderSort (0ms)
-		DisableScriptedObjects (6ms)
+		DisableScriptedObjects (4ms)
 		BackupInstance (0ms)
 		ReleaseScriptingObjects (0ms)
-		CreateAndSetChildDomain (24ms)
-	RebuildCommonClasses (27ms)
+		CreateAndSetChildDomain (20ms)
+	RebuildCommonClasses (23ms)
 	RebuildNativeTypeToScriptingClass (7ms)
-	initialDomainReloadingComplete (15ms)
-	LoadAllAssembliesAndSetupDomain (89ms)
-		LoadAssemblies (158ms)
+	initialDomainReloadingComplete (22ms)
+	LoadAllAssembliesAndSetupDomain (191ms)
+		LoadAssemblies (184ms)
 		RebuildTransferFunctionScriptingTraits (0ms)
-		AnalyzeDomain (6ms)
-			TypeCache.Refresh (4ms)
-				TypeCache.ScanAssembly (0ms)
-			BuildScriptInfoCaches (0ms)
-			ResolveRequiredComponents (0ms)
-	FinalizeReload (399ms)
+		AnalyzeDomain (70ms)
+			TypeCache.Refresh (49ms)
+				TypeCache.ScanAssembly (44ms)
+			BuildScriptInfoCaches (17ms)
+			ResolveRequiredComponents (2ms)
+	FinalizeReload (452ms)
 		ReleaseScriptCaches (0ms)
 		RebuildScriptCaches (0ms)
-		SetupLoadedEditorAssemblies (233ms)
+		SetupLoadedEditorAssemblies (326ms)
 			LogAssemblyErrors (0ms)
 			InitializePlatformSupportModulesInManaged (2ms)
-			SetLoadedEditorAssemblies (3ms)
-			BeforeProcessingInitializeOnLoad (8ms)
-			ProcessInitializeOnLoadAttributes (90ms)
-			ProcessInitializeOnLoadMethodAttributes (126ms)
-			AfterProcessingInitializeOnLoad (4ms)
+			SetLoadedEditorAssemblies (4ms)
+			BeforeProcessingInitializeOnLoad (43ms)
+			ProcessInitializeOnLoadAttributes (129ms)
+			ProcessInitializeOnLoadMethodAttributes (146ms)
+			AfterProcessingInitializeOnLoad (3ms)
 			EditorAssembliesLoaded (0ms)
 		ExecutionOrderSort2 (0ms)
-		AwakeInstancesAfterBackupRestoration (6ms)
+		AwakeInstancesAfterBackupRestoration (5ms)
 Launched and connected shader compiler UnityShaderCompiler.exe after 0.01 seconds
-Refreshing native plugins compatible for Editor in 0.18 ms, found 0 plugins.
+Refreshing native plugins compatible for Editor in 0.19 ms, found 0 plugins.
 Preloading 0 native plugins for Editor in 0.00 ms.
-Unloading 7 Unused Serialized files (Serialized files now loaded: 0)
-Unloading 36 unused Assets / (70.9 KB). Loaded Objects now: 629.
-Memory consumption went from 79.7 MB to 79.7 MB.
-Total: 3.117700 ms (FindLiveObjects: 0.043500 ms CreateObjectMapping: 0.003900 ms MarkObjects: 3.013100 ms  DeleteObjects: 0.055500 ms)
+Unloading 82 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 2990 unused Assets / (5.0 MB). Loaded Objects now: 3587.
+Memory consumption went from 134.5 MB to 129.6 MB.
+Total: 4.824600 ms (FindLiveObjects: 0.229600 ms CreateObjectMapping: 0.125900 ms MarkObjects: 3.437200 ms  DeleteObjects: 1.031200 ms)
 
 ========================================================================
 Received Prepare
-Refreshing native plugins compatible for Editor in 0.16 ms, found 0 plugins.
+Refreshing native plugins compatible for Editor in 0.33 ms, found 0 plugins.
 Preloading 0 native plugins for Editor in 0.00 ms.
-Unloading 0 Unused Serialized files (Serialized files now loaded: 0)
-Unloading 33 unused Assets / (1.0 KB). Loaded Objects now: 630.
-Memory consumption went from 77.5 MB to 77.5 MB.
-Total: 5.061900 ms (FindLiveObjects: 0.029600 ms CreateObjectMapping: 0.004200 ms MarkObjects: 5.002900 ms  DeleteObjects: 0.023900 ms)
-
-Prepare: number of updated asset objects reloaded= 0
-========================================================================
-Received Prepare
-Refreshing native plugins compatible for Editor in 0.40 ms, found 0 plugins.
-Preloading 0 native plugins for Editor in 0.00 ms.
-Unloading 0 Unused Serialized files (Serialized files now loaded: 0)
-Unloading 33 unused Assets / (0 B). Loaded Objects now: 630.
-Memory consumption went from 77.5 MB to 77.5 MB.
-Total: 4.747900 ms (FindLiveObjects: 0.047900 ms CreateObjectMapping: 0.005800 ms MarkObjects: 4.658600 ms  DeleteObjects: 0.033900 ms)
+Unloading 34 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 3017 unused Assets / (4.1 MB). Loaded Objects now: 3618.
+Memory consumption went from 121.8 MB to 117.7 MB.
+Total: 12.059100 ms (FindLiveObjects: 0.397200 ms CreateObjectMapping: 0.141600 ms MarkObjects: 9.760400 ms  DeleteObjects: 1.758700 ms)
 
 Prepare: number of updated asset objects reloaded= 0
 ========================================================================
 Received Prepare
-Refreshing native plugins compatible for Editor in 0.35 ms, found 0 plugins.
+Refreshing native plugins compatible for Editor in 0.23 ms, found 0 plugins.
 Preloading 0 native plugins for Editor in 0.00 ms.
-Unloading 1 Unused Serialized files (Serialized files now loaded: 0)
-Unloading 374 unused Assets / (46.6 KB). Loaded Objects now: 970.
-Memory consumption went from 79.5 MB to 79.5 MB.
-Total: 5.130100 ms (FindLiveObjects: 0.085200 ms CreateObjectMapping: 0.017700 ms MarkObjects: 4.870600 ms  DeleteObjects: 0.154800 ms)
-
-Prepare: number of updated asset objects reloaded= 0
-========================================================================
-Received Prepare
-Refreshing native plugins compatible for Editor in 0.20 ms, found 0 plugins.
-Preloading 0 native plugins for Editor in 0.00 ms.
-Unloading 1 Unused Serialized files (Serialized files now loaded: 0)
-Unloading 373 unused Assets / (45.4 KB). Loaded Objects now: 969.
-Memory consumption went from 79.5 MB to 79.5 MB.
-Total: 9.861100 ms (FindLiveObjects: 0.187400 ms CreateObjectMapping: 0.018200 ms MarkObjects: 9.492100 ms  DeleteObjects: 0.162100 ms)
+Unloading 34 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 3014 unused Assets / (4.8 MB). Loaded Objects now: 3615.
+Memory consumption went from 121.8 MB to 117.0 MB.
+Total: 6.381200 ms (FindLiveObjects: 0.431000 ms CreateObjectMapping: 0.158100 ms MarkObjects: 4.649800 ms  DeleteObjects: 1.141100 ms)
 
 Prepare: number of updated asset objects reloaded= 0
 ========================================================================
 Received Prepare
 Refreshing native plugins compatible for Editor in 0.17 ms, found 0 plugins.
 Preloading 0 native plugins for Editor in 0.00 ms.
-Unloading 1 Unused Serialized files (Serialized files now loaded: 0)
-Unloading 372 unused Assets / (55.5 KB). Loaded Objects now: 968.
-Memory consumption went from 79.5 MB to 79.5 MB.
-Total: 4.297500 ms (FindLiveObjects: 0.052900 ms CreateObjectMapping: 0.011200 ms MarkObjects: 4.106900 ms  DeleteObjects: 0.125700 ms)
+Unloading 34 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 3013 unused Assets / (4.7 MB). Loaded Objects now: 3614.
+Memory consumption went from 121.8 MB to 117.1 MB.
+Total: 4.567400 ms (FindLiveObjects: 0.202400 ms CreateObjectMapping: 0.088000 ms MarkObjects: 3.316400 ms  DeleteObjects: 0.959800 ms)
 
 Prepare: number of updated asset objects reloaded= 0
 ========================================================================
 Received Prepare
-Refreshing native plugins compatible for Editor in 0.22 ms, found 0 plugins.
+Refreshing native plugins compatible for Editor in 0.19 ms, found 0 plugins.
 Preloading 0 native plugins for Editor in 0.00 ms.
-Unloading 1 Unused Serialized files (Serialized files now loaded: 0)
-Unloading 373 unused Assets / (45.4 KB). Loaded Objects now: 969.
-Memory consumption went from 79.5 MB to 79.5 MB.
-Total: 6.488700 ms (FindLiveObjects: 0.079900 ms CreateObjectMapping: 0.011700 ms MarkObjects: 6.249500 ms  DeleteObjects: 0.146100 ms)
+Unloading 34 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 3012 unused Assets / (4.7 MB). Loaded Objects now: 3613.
+Memory consumption went from 121.8 MB to 117.1 MB.
+Total: 5.179200 ms (FindLiveObjects: 0.236200 ms CreateObjectMapping: 0.128300 ms MarkObjects: 3.672300 ms  DeleteObjects: 1.141800 ms)
 
 Prepare: number of updated asset objects reloaded= 0
 ========================================================================
 Received Prepare
-Refreshing native plugins compatible for Editor in 0.34 ms, found 0 plugins.
+Refreshing native plugins compatible for Editor in 0.19 ms, found 0 plugins.
 Preloading 0 native plugins for Editor in 0.00 ms.
-Unloading 1 Unused Serialized files (Serialized files now loaded: 0)
-Unloading 373 unused Assets / (49.9 KB). Loaded Objects now: 969.
-Memory consumption went from 79.5 MB to 79.5 MB.
-Total: 6.656100 ms (FindLiveObjects: 0.089400 ms CreateObjectMapping: 0.016900 ms MarkObjects: 6.347800 ms  DeleteObjects: 0.200000 ms)
+Unloading 34 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 2997 unused Assets / (4.7 MB). Loaded Objects now: 3598.
+Memory consumption went from 121.8 MB to 117.1 MB.
+Total: 5.852200 ms (FindLiveObjects: 0.250700 ms CreateObjectMapping: 0.147000 ms MarkObjects: 4.436700 ms  DeleteObjects: 1.017000 ms)
 
 Prepare: number of updated asset objects reloaded= 0
 ========================================================================
 Received Prepare
-Refreshing native plugins compatible for Editor in 0.76 ms, found 0 plugins.
+Refreshing native plugins compatible for Editor in 0.18 ms, found 0 plugins.
 Preloading 0 native plugins for Editor in 0.00 ms.
-Unloading 1 Unused Serialized files (Serialized files now loaded: 0)
-Unloading 373 unused Assets / (45.4 KB). Loaded Objects now: 969.
-Memory consumption went from 79.5 MB to 79.5 MB.
-Total: 7.464100 ms (FindLiveObjects: 0.108800 ms CreateObjectMapping: 0.024800 ms MarkObjects: 7.068600 ms  DeleteObjects: 0.260300 ms)
-
-Prepare: number of updated asset objects reloaded= 0
-========================================================================
-Received Prepare
-Refreshing native plugins compatible for Editor in 0.32 ms, found 0 plugins.
-Preloading 0 native plugins for Editor in 0.00 ms.
-Unloading 1 Unused Serialized files (Serialized files now loaded: 0)
-Unloading 373 unused Assets / (45.4 KB). Loaded Objects now: 969.
-Memory consumption went from 79.5 MB to 79.5 MB.
-Total: 6.597400 ms (FindLiveObjects: 0.089000 ms CreateObjectMapping: 0.038700 ms MarkObjects: 6.221700 ms  DeleteObjects: 0.245700 ms)
-
-Prepare: number of updated asset objects reloaded= 0
-========================================================================
-Received Prepare
-Refreshing native plugins compatible for Editor in 0.50 ms, found 0 plugins.
-Preloading 0 native plugins for Editor in 0.00 ms.
-Unloading 1 Unused Serialized files (Serialized files now loaded: 0)
-Unloading 373 unused Assets / (45.5 KB). Loaded Objects now: 969.
-Memory consumption went from 79.5 MB to 79.5 MB.
-Total: 9.150400 ms (FindLiveObjects: 0.102200 ms CreateObjectMapping: 0.019000 ms MarkObjects: 8.659700 ms  DeleteObjects: 0.366500 ms)
+Unloading 34 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 2991 unused Assets / (4.5 MB). Loaded Objects now: 3592.
+Memory consumption went from 121.8 MB to 117.3 MB.
+Total: 4.988100 ms (FindLiveObjects: 0.242400 ms CreateObjectMapping: 0.134600 ms MarkObjects: 3.639200 ms  DeleteObjects: 0.971200 ms)
 
 Prepare: number of updated asset objects reloaded= 0
