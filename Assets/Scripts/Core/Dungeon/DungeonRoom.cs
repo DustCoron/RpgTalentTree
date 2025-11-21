@@ -141,5 +141,81 @@ namespace RpgTalentTree.Core.Dungeon
             if (minDist == distToEast) return Doorway.WallSide.East;
             return Doorway.WallSide.West;
         }
+
+        /// <summary>
+        /// Get the world-space bounds of the room
+        /// </summary>
+        public Bounds GetBounds()
+        {
+            Vector3 center = new Vector3(Position.x + Size.x / 2f, FloorHeight, Position.z + Size.z / 2f);
+            Vector3 size = new Vector3(Size.x, Size.y, Size.z);
+            return new Bounds(center, size);
+        }
+
+        /// <summary>
+        /// Get the outward-facing normal for a wall side
+        /// </summary>
+        public static Vector3 GetWallNormal(Doorway.WallSide wall)
+        {
+            return wall switch
+            {
+                Doorway.WallSide.North => Vector3.forward,
+                Doorway.WallSide.South => Vector3.back,
+                Doorway.WallSide.East => Vector3.right,
+                Doorway.WallSide.West => Vector3.left,
+                _ => Vector3.forward
+            };
+        }
+
+        /// <summary>
+        /// Get the wall edge center position (world space)
+        /// </summary>
+        public Vector3 GetWallCenter(Doorway.WallSide wall)
+        {
+            return wall switch
+            {
+                Doorway.WallSide.North => new Vector3(Position.x + Size.x / 2f, FloorHeight, Position.z + Size.z),
+                Doorway.WallSide.South => new Vector3(Position.x + Size.x / 2f, FloorHeight, Position.z),
+                Doorway.WallSide.East => new Vector3(Position.x + Size.x, FloorHeight, Position.z + Size.z / 2f),
+                Doorway.WallSide.West => new Vector3(Position.x, FloorHeight, Position.z + Size.z / 2f),
+                _ => GetCenter()
+            };
+        }
+
+        /// <summary>
+        /// Find the best wall and exit point to connect to another room
+        /// Returns the wall side and the exit point on that wall
+        /// </summary>
+        public (Doorway.WallSide wall, Vector3 exitPoint, Vector3 direction) GetBestConnectionPoint(DungeonRoom targetRoom)
+        {
+            Vector3 targetCenter = targetRoom.GetCenter();
+            Vector3 myCenter = GetCenter();
+            Vector3 toTarget = targetCenter - myCenter;
+
+            // Determine which wall to use based on direction to target
+            Doorway.WallSide bestWall;
+            if (Mathf.Abs(toTarget.x) > Mathf.Abs(toTarget.z))
+            {
+                bestWall = toTarget.x > 0 ? Doorway.WallSide.East : Doorway.WallSide.West;
+            }
+            else
+            {
+                bestWall = toTarget.z > 0 ? Doorway.WallSide.North : Doorway.WallSide.South;
+            }
+
+            Vector3 exitPoint = GetWallCenter(bestWall);
+            Vector3 direction = GetWallNormal(bestWall);
+
+            return (bestWall, exitPoint, direction);
+        }
+
+        /// <summary>
+        /// Check if a world position is inside this room
+        /// </summary>
+        public bool ContainsPoint(Vector3 worldPos)
+        {
+            return worldPos.x >= Position.x && worldPos.x <= Position.x + Size.x &&
+                   worldPos.z >= Position.z && worldPos.z <= Position.z + Size.z;
+        }
     }
 }

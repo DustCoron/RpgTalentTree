@@ -325,25 +325,63 @@ namespace RpgTalentTree.Core.Dungeon
         /// </summary>
         private void ConnectRoomsSameLevel(DungeonRoom roomA, DungeonRoom roomB, int corridorIndex, Vector3 startPos, Vector3 endPos)
         {
-            // Create L-shaped corridor (horizontal then vertical)
-            Vector3 cornerPos = new Vector3(endPos.x, startPos.y, startPos.z);
+            // Get best exit points from each room (always facing outward)
+            var (wallA, exitA, dirA) = roomA.GetBestConnectionPoint(roomB);
+            var (wallB, exitB, dirB) = roomB.GetBestConnectionPoint(roomA);
 
-            // Find doorway positions on room boundaries
-            Vector3 doorwayA = FindRoomBoundaryIntersection(roomA, startPos, cornerPos);
-            roomA.AddDoorway(doorwayA, corridorWidth);
+            // Add doorways at the exit points
+            roomA.AddDoorway(exitA, corridorWidth);
+            roomB.AddDoorway(exitB, corridorWidth);
 
-            Vector3 doorwayB = FindRoomBoundaryIntersection(roomB, endPos, cornerPos);
-            roomB.AddDoorway(doorwayB, corridorWidth);
+            // Track room connectivity
+            roomA.ConnectTo(roomB);
 
-            // Calculate corridor corner position
-            Vector3 corridorCorner = new Vector3(doorwayB.x, doorwayA.y, doorwayA.z);
+            // Calculate corridor corner based on exit directions
+            Vector3 corridorCorner;
+            bool needsCorner = true;
 
-            // Create corridors from doorway to doorway
-            CreateCorridor(doorwayA, corridorCorner, corridorIndex, "Horizontal");
-            CreateCorridor(corridorCorner, doorwayB, corridorIndex, "Vertical");
+            // If both exits are on same axis, create straight corridor
+            if ((wallA == Doorway.WallSide.North || wallA == Doorway.WallSide.South) &&
+                (wallB == Doorway.WallSide.North || wallB == Doorway.WallSide.South))
+            {
+                // Both on Z axis - check if aligned on X
+                if (Mathf.Abs(exitA.x - exitB.x) < 0.1f)
+                {
+                    needsCorner = false;
+                    CreateCorridor(exitA, exitB, corridorIndex, "Straight");
+                }
+                else
+                {
+                    corridorCorner = new Vector3(exitA.x, exitA.y, (exitA.z + exitB.z) / 2f);
+                }
+            }
+            else if ((wallA == Doorway.WallSide.East || wallA == Doorway.WallSide.West) &&
+                     (wallB == Doorway.WallSide.East || wallB == Doorway.WallSide.West))
+            {
+                // Both on X axis - check if aligned on Z
+                if (Mathf.Abs(exitA.z - exitB.z) < 0.1f)
+                {
+                    needsCorner = false;
+                    CreateCorridor(exitA, exitB, corridorIndex, "Straight");
+                }
+                else
+                {
+                    corridorCorner = new Vector3((exitA.x + exitB.x) / 2f, exitA.y, exitA.z);
+                }
+            }
+            else
+            {
+                // L-shaped corridor - corner at intersection of exit directions
+                corridorCorner = new Vector3(exitB.x, exitA.y, exitA.z);
+            }
 
-            // Create corner piece at junction
-            CreateCorridorCorner(corridorCorner, corridorIndex);
+            if (needsCorner)
+            {
+                corridorCorner = new Vector3(exitB.x, exitA.y, exitA.z);
+                CreateCorridor(exitA, corridorCorner, corridorIndex, "Horizontal");
+                CreateCorridor(corridorCorner, exitB, corridorIndex, "Vertical");
+                CreateCorridorCorner(corridorCorner, corridorIndex);
+            }
         }
 
         /// <summary>
@@ -351,23 +389,26 @@ namespace RpgTalentTree.Core.Dungeon
         /// </summary>
         private void ConnectRoomsWithStairs(DungeonRoom roomA, DungeonRoom roomB, int corridorIndex, Vector3 startPos, Vector3 endPos)
         {
-            // Calculate midpoint for stairs location
-            Vector3 midPoint = new Vector3((startPos.x + endPos.x) / 2f, startPos.y, (startPos.z + endPos.z) / 2f);
-            Vector3 stairsStart = new Vector3(midPoint.x, startPos.y, midPoint.z);
-            Vector3 stairsEnd = new Vector3(midPoint.x, endPos.y, midPoint.z);
+            // Get best exit points from each room (always facing outward)
+            var (wallA, exitA, dirA) = roomA.GetBestConnectionPoint(roomB);
+            var (wallB, exitB, dirB) = roomB.GetBestConnectionPoint(roomA);
 
-            // Find doorway positions for both rooms
-            Vector3 doorwayA = FindRoomBoundaryIntersection(roomA, startPos, stairsStart);
-            roomA.AddDoorway(doorwayA, corridorWidth);
+            // Add doorways at the exit points
+            roomA.AddDoorway(exitA, corridorWidth);
+            roomB.AddDoorway(exitB, corridorWidth);
 
-            Vector3 doorwayB = FindRoomBoundaryIntersection(roomB, endPos, stairsEnd);
-            roomB.AddDoorway(doorwayB, corridorWidth);
+            // Track room connectivity
+            roomA.ConnectTo(roomB);
 
-            // Create corridor from roomA doorway to stairs start
-            CreateCorridor(doorwayA, stairsStart, corridorIndex, "ToStairs");
+            // Calculate stairs position - midpoint between exits
+            Vector3 stairsStart = new Vector3((exitA.x + exitB.x) / 2f, exitA.y, (exitA.z + exitB.z) / 2f);
+            Vector3 stairsEnd = new Vector3(stairsStart.x, exitB.y, stairsStart.z);
+
+            // Create corridor from roomA exit to stairs (going outward)
+            CreateCorridor(exitA, stairsStart, corridorIndex, "ToStairs");
 
             // Create corner at stairs start if corridor changes direction
-            if (Mathf.Abs(doorwayA.x - stairsStart.x) > 0.1f && Mathf.Abs(doorwayA.z - stairsStart.z) > 0.1f)
+            if (Mathf.Abs(exitA.x - stairsStart.x) > 0.1f && Mathf.Abs(exitA.z - stairsStart.z) > 0.1f)
             {
                 CreateCorridorCorner(stairsStart, corridorIndex);
             }
@@ -378,11 +419,11 @@ namespace RpgTalentTree.Core.Dungeon
                 stairsGenerator.CreateStairs(stairsStart, stairsEnd, dungeonParent.transform, corridorIndex);
             }
 
-            // Create corridor from stairs end to roomB doorway
-            CreateCorridor(stairsEnd, doorwayB, corridorIndex, "FromStairs");
+            // Create corridor from stairs end to roomB exit (going outward from B)
+            CreateCorridor(stairsEnd, exitB, corridorIndex, "FromStairs");
 
             // Create corner at stairs end if corridor changes direction
-            if (Mathf.Abs(stairsEnd.x - doorwayB.x) > 0.1f && Mathf.Abs(stairsEnd.z - doorwayB.z) > 0.1f)
+            if (Mathf.Abs(stairsEnd.x - exitB.x) > 0.1f && Mathf.Abs(stairsEnd.z - exitB.z) > 0.1f)
             {
                 CreateCorridorCorner(stairsEnd, corridorIndex);
             }
