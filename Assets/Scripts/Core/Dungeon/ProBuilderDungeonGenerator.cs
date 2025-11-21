@@ -108,12 +108,15 @@ namespace RpgTalentTree.Core.Dungeon
             ClearDungeon();
             InitializeGenerator();
             GenerateRooms();
+            corridorGenerator?.ClearPaths();
             GenerateCorridorsAndDoorways();
+            corridorGenerator?.CreateJunctions(dungeonParent.transform);
             CreateRoomMeshes();
             GenerateMarkers();
             AddDecorations();
             OptimizeMeshes();
-            Debug.Log($"Dungeon generated with {rooms.Count} rooms, {dungeonMarkers.Count} markers");
+            int junctionCount = corridorGenerator?.GetJunctionPoints().Count ?? 0;
+            Debug.Log($"Dungeon generated with {rooms.Count} rooms, {dungeonMarkers.Count} markers, {junctionCount} junctions");
         }
 
         /// <summary>
