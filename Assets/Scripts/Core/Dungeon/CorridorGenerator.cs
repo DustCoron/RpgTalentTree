@@ -139,50 +139,68 @@ namespace RpgTalentTree.Core.Dungeon
         }
 
         /// <summary>
-        /// Calculate waypoints including extra corners for long segments
+        /// Calculate waypoints including dog-leg corners for long segments
         /// </summary>
         private List<Vector3> CalculateCorridorWaypoints(Vector3 start, Vector3 startDir, Vector3 end, Vector3 endDir)
         {
             List<Vector3> waypoints = new List<Vector3> { start };
 
-            // Calculate initial corner
+            // Calculate initial corner for L-shape
             Vector3 corner = CalculateCornerPoint(start, startDir, end, endDir);
 
-            // Check if first segment is too long - add extra corner
+            // Process first segment (start to corner)
             float dist1 = Vector3.Distance(start, corner);
             if (dist1 > maxSegmentLength)
             {
-                int extraCorners = Mathf.FloorToInt(dist1 / maxSegmentLength);
-                Vector3 dir1 = (corner - start).normalized;
-                for (int i = 1; i <= extraCorners; i++)
-                {
-                    Vector3 extraCorner = start + dir1 * (maxSegmentLength * i);
-                    // Offset perpendicular to avoid straight line
-                    Vector3 perp = Vector3.Cross(dir1, Vector3.up).normalized;
-                    extraCorner += perp * corridorWidth * ((i % 2 == 0) ? 1 : -1);
-                    waypoints.Add(extraCorner);
-                }
+                AddDogLegWaypoints(waypoints, start, corner);
             }
 
             waypoints.Add(corner);
 
-            // Check if second segment is too long
+            // Process second segment (corner to end)
             float dist2 = Vector3.Distance(corner, end);
             if (dist2 > maxSegmentLength)
             {
-                int extraCorners = Mathf.FloorToInt(dist2 / maxSegmentLength);
-                Vector3 dir2 = (end - corner).normalized;
-                for (int i = 1; i <= extraCorners; i++)
-                {
-                    Vector3 extraCorner = corner + dir2 * (maxSegmentLength * i);
-                    Vector3 perp = Vector3.Cross(dir2, Vector3.up).normalized;
-                    extraCorner += perp * corridorWidth * ((i % 2 == 0) ? 1 : -1);
-                    waypoints.Add(extraCorner);
-                }
+                AddDogLegWaypoints(waypoints, corner, end);
             }
 
             waypoints.Add(end);
             return waypoints;
+        }
+
+        /// <summary>
+        /// Add dog-leg (jog) waypoints in the middle of a long segment
+        /// Creates pattern: start -> corner1 -> corner2 -> continues toward end
+        /// </summary>
+        private void AddDogLegWaypoints(List<Vector3> waypoints, Vector3 segStart, Vector3 segEnd)
+        {
+            Vector3 dir = (segEnd - segStart).normalized;
+            float totalDist = Vector3.Distance(segStart, segEnd);
+
+            // Calculate number of dog-legs needed
+            int dogLegs = Mathf.FloorToInt(totalDist / maxSegmentLength);
+
+            for (int d = 0; d < dogLegs; d++)
+            {
+                // Place dog-leg in the middle of each max-length section
+                float startT = (d * maxSegmentLength + maxSegmentLength * 0.4f) / totalDist;
+                float endT = (d * maxSegmentLength + maxSegmentLength * 0.6f) / totalDist;
+
+                Vector3 dogLegStart = Vector3.Lerp(segStart, segEnd, startT);
+                Vector3 dogLegEnd = Vector3.Lerp(segStart, segEnd, endT);
+
+                // Offset perpendicular - alternate sides
+                Vector3 perp = Vector3.Cross(dir, Vector3.up).normalized;
+                float offsetAmount = corridorWidth * 2f * ((d % 2 == 0) ? 1 : -1);
+
+                // First corner - go perpendicular
+                Vector3 corner1 = dogLegStart + perp * offsetAmount;
+                // Second corner - come back to line
+                Vector3 corner2 = dogLegEnd + perp * offsetAmount;
+
+                waypoints.Add(corner1);
+                waypoints.Add(corner2);
+            }
         }
 
         /// <summary>
