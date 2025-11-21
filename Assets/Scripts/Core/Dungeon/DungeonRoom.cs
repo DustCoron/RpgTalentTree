@@ -53,6 +53,9 @@ namespace RpgTalentTree.Core.Dungeon
         public List<int> ConnectedRoomIds { get; private set; } = new List<int>();
         public RoomType Type { get; set; } = RoomType.Normal;
 
+        // Track which walls have doorways (one corridor per wall)
+        private HashSet<Doorway.WallSide> usedWalls = new HashSet<Doorway.WallSide>();
+
         // Metadata for custom data
         public Dictionary<string, object> Metadata { get; private set; } = new Dictionary<string, object>();
 
@@ -63,6 +66,27 @@ namespace RpgTalentTree.Core.Dungeon
             Size = size;
             FloorHeight = floorHeight;
             Doorways = new List<Doorway>();
+        }
+
+        /// <summary>
+        /// Check if a wall is available for a new doorway
+        /// </summary>
+        public bool IsWallAvailable(Doorway.WallSide wall) => !usedWalls.Contains(wall);
+
+        /// <summary>
+        /// Get count of available walls for doorways
+        /// </summary>
+        public int GetAvailableWallCount() => 4 - usedWalls.Count;
+
+        /// <summary>
+        /// Reserve a wall for a doorway
+        /// </summary>
+        public bool ReserveWall(Doorway.WallSide wall)
+        {
+            if (usedWalls.Contains(wall))
+                return false;
+            usedWalls.Add(wall);
+            return true;
         }
 
         public void ConnectTo(DungeonRoom other)
@@ -183,30 +207,47 @@ namespace RpgTalentTree.Core.Dungeon
         }
 
         /// <summary>
-        /// Find the best wall and exit point to connect to another room
-        /// Returns the wall side and the exit point on that wall
+        /// Find the best available wall and exit point to connect to another room
+        /// Returns null if no walls are available
         /// </summary>
-        public (Doorway.WallSide wall, Vector3 exitPoint, Vector3 direction) GetBestConnectionPoint(DungeonRoom targetRoom)
+        public (Doorway.WallSide wall, Vector3 exitPoint, Vector3 direction)? GetBestConnectionPoint(DungeonRoom targetRoom)
         {
+            if (GetAvailableWallCount() == 0)
+                return null;
+
             Vector3 targetCenter = targetRoom.GetCenter();
             Vector3 myCenter = GetCenter();
             Vector3 toTarget = targetCenter - myCenter;
 
-            // Determine which wall to use based on direction to target
-            Doorway.WallSide bestWall;
+            // Priority order of walls based on direction to target
+            Doorway.WallSide[] wallPriority;
             if (Mathf.Abs(toTarget.x) > Mathf.Abs(toTarget.z))
             {
-                bestWall = toTarget.x > 0 ? Doorway.WallSide.East : Doorway.WallSide.West;
+                if (toTarget.x > 0)
+                    wallPriority = new[] { Doorway.WallSide.East, Doorway.WallSide.North, Doorway.WallSide.South, Doorway.WallSide.West };
+                else
+                    wallPriority = new[] { Doorway.WallSide.West, Doorway.WallSide.North, Doorway.WallSide.South, Doorway.WallSide.East };
             }
             else
             {
-                bestWall = toTarget.z > 0 ? Doorway.WallSide.North : Doorway.WallSide.South;
+                if (toTarget.z > 0)
+                    wallPriority = new[] { Doorway.WallSide.North, Doorway.WallSide.East, Doorway.WallSide.West, Doorway.WallSide.South };
+                else
+                    wallPriority = new[] { Doorway.WallSide.South, Doorway.WallSide.East, Doorway.WallSide.West, Doorway.WallSide.North };
             }
 
-            Vector3 exitPoint = GetWallCenter(bestWall);
-            Vector3 direction = GetWallNormal(bestWall);
+            // Find first available wall
+            foreach (var wall in wallPriority)
+            {
+                if (IsWallAvailable(wall))
+                {
+                    Vector3 exitPoint = GetWallCenter(wall);
+                    Vector3 direction = GetWallNormal(wall);
+                    return (wall, exitPoint, direction);
+                }
+            }
 
-            return (bestWall, exitPoint, direction);
+            return null;
         }
 
         /// <summary>

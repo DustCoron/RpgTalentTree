@@ -330,9 +330,23 @@ namespace RpgTalentTree.Core.Dungeon
         /// </summary>
         private void ConnectRoomsSameLevel(DungeonRoom roomA, DungeonRoom roomB, int corridorIndex, Vector3 startPos, Vector3 endPos)
         {
-            // Get best exit points from each room (always facing outward)
-            var (wallA, exitA, dirA) = roomA.GetBestConnectionPoint(roomB);
-            var (wallB, exitB, dirB) = roomB.GetBestConnectionPoint(roomA);
+            // Get best available exit points from each room
+            var connectionA = roomA.GetBestConnectionPoint(roomB);
+            var connectionB = roomB.GetBestConnectionPoint(roomA);
+
+            // Skip if either room has no available walls
+            if (!connectionA.HasValue || !connectionB.HasValue)
+            {
+                Debug.Log($"Skipping corridor {corridorIndex}: no available walls");
+                return;
+            }
+
+            var (wallA, exitA, dirA) = connectionA.Value;
+            var (wallB, exitB, dirB) = connectionB.Value;
+
+            // Reserve walls so they can't be used again
+            roomA.ReserveWall(wallA);
+            roomB.ReserveWall(wallB);
 
             // Add doorways at the exit points
             roomA.AddDoorway(exitA, corridorWidth);
@@ -343,12 +357,10 @@ namespace RpgTalentTree.Core.Dungeon
 
             if (useSplineCorridors)
             {
-                // Simple: just connect doorways with curved spline corridor
                 corridorGenerator.CreateSplineCorridor(exitA, dirA, exitB, dirB, dungeonParent.transform, corridorIndex, splineSegments);
             }
             else
             {
-                // Fallback: straight corridor (for testing)
                 CreateCorridor(exitA, exitB, corridorIndex, "Direct");
             }
         }
@@ -358,9 +370,23 @@ namespace RpgTalentTree.Core.Dungeon
         /// </summary>
         private void ConnectRoomsWithStairs(DungeonRoom roomA, DungeonRoom roomB, int corridorIndex, Vector3 startPos, Vector3 endPos)
         {
-            // Get best exit points from each room (always facing outward)
-            var (wallA, exitA, dirA) = roomA.GetBestConnectionPoint(roomB);
-            var (wallB, exitB, dirB) = roomB.GetBestConnectionPoint(roomA);
+            // Get best available exit points from each room
+            var connectionA = roomA.GetBestConnectionPoint(roomB);
+            var connectionB = roomB.GetBestConnectionPoint(roomA);
+
+            // Skip if either room has no available walls
+            if (!connectionA.HasValue || !connectionB.HasValue)
+            {
+                Debug.Log($"Skipping stairs corridor {corridorIndex}: no available walls");
+                return;
+            }
+
+            var (wallA, exitA, dirA) = connectionA.Value;
+            var (wallB, exitB, dirB) = connectionB.Value;
+
+            // Reserve walls
+            roomA.ReserveWall(wallA);
+            roomB.ReserveWall(wallB);
 
             // Add doorways at the exit points
             roomA.AddDoorway(exitA, corridorWidth);
@@ -379,14 +405,9 @@ namespace RpgTalentTree.Core.Dungeon
 
             if (useSplineCorridors)
             {
-                // Spline corridor from roomA to stairs
                 corridorGenerator.CreateSplineCorridor(exitA, dirA, stairsStart, -toStairsA, dungeonParent.transform, corridorIndex, splineSegments / 2);
-
-                // Create stairs
                 if (stairsGenerator != null)
                     stairsGenerator.CreateStairs(stairsStart, stairsEnd, dungeonParent.transform, corridorIndex);
-
-                // Spline corridor from stairs to roomB
                 corridorGenerator.CreateSplineCorridor(stairsEnd, toStairsB, exitB, dirB, dungeonParent.transform, corridorIndex, splineSegments / 2);
             }
             else
