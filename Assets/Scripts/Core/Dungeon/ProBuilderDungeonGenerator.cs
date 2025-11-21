@@ -588,7 +588,21 @@ namespace RpgTalentTree.Core.Dungeon
             // Use ProBuilder's CombineMeshes to merge all meshes into target
             List<ProBuilderMesh> combinedMeshes = CombineMeshes.Combine(allMeshes, targetMesh);
 
-            Debug.Log($"Optimization complete: Meshes combined into {combinedMeshes.Count} mesh(es)");
+            if (combinedMeshes != null && combinedMeshes.Count > 0)
+            {
+                Debug.Log($"Optimization complete: Meshes combined into {combinedMeshes.Count} mesh(es)");
+            }
+            else
+            {
+                Debug.LogWarning("Mesh combining failed or returned no meshes");
+                if (targetObj != null)
+                {
+                    if (Application.isPlaying)
+                        Destroy(targetObj);
+                    else
+                        DestroyImmediate(targetObj);
+                }
+            }
         }
 
         private void OnValidate()
