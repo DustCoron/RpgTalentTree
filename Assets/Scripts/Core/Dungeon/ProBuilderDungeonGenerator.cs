@@ -336,51 +336,73 @@ namespace RpgTalentTree.Core.Dungeon
             // Track room connectivity
             roomA.ConnectTo(roomB);
 
-            // Calculate corridor corner based on exit directions
-            Vector3 corridorCorner;
-            bool needsCorner = true;
+            // Determine if walls are on same axis
+            bool wallAIsNS = (wallA == Doorway.WallSide.North || wallA == Doorway.WallSide.South);
+            bool wallBIsNS = (wallB == Doorway.WallSide.North || wallB == Doorway.WallSide.South);
 
-            // If both exits are on same axis, create straight corridor
-            if ((wallA == Doorway.WallSide.North || wallA == Doorway.WallSide.South) &&
-                (wallB == Doorway.WallSide.North || wallB == Doorway.WallSide.South))
+            if (wallAIsNS == wallBIsNS)
             {
-                // Both on Z axis - check if aligned on X
-                if (Mathf.Abs(exitA.x - exitB.x) < 0.1f)
+                // Both walls on same axis - may need simple L or straight corridor
+                if (wallAIsNS)
                 {
-                    needsCorner = false;
-                    CreateCorridor(exitA, exitB, corridorIndex, "Straight");
+                    // Both on Z axis
+                    if (Mathf.Abs(exitA.x - exitB.x) < corridorWidth)
+                    {
+                        // Aligned - straight corridor
+                        CreateCorridor(exitA, exitB, corridorIndex, "Straight");
+                    }
+                    else
+                    {
+                        // L-shape: go Z first, then X
+                        float midZ = (exitA.z + exitB.z) / 2f;
+                        Vector3 corner1 = new Vector3(exitA.x, exitA.y, midZ);
+                        Vector3 corner2 = new Vector3(exitB.x, exitA.y, midZ);
+                        CreateCorridor(exitA, corner1, corridorIndex, "Segment1");
+                        CreateCorridor(corner1, corner2, corridorIndex, "Segment2");
+                        CreateCorridor(corner2, exitB, corridorIndex, "Segment3");
+                        CreateCorridorCorner(corner1, corridorIndex);
+                        CreateCorridorCorner(corner2, corridorIndex);
+                    }
                 }
                 else
                 {
-                    corridorCorner = new Vector3(exitA.x, exitA.y, (exitA.z + exitB.z) / 2f);
-                }
-            }
-            else if ((wallA == Doorway.WallSide.East || wallA == Doorway.WallSide.West) &&
-                     (wallB == Doorway.WallSide.East || wallB == Doorway.WallSide.West))
-            {
-                // Both on X axis - check if aligned on Z
-                if (Mathf.Abs(exitA.z - exitB.z) < 0.1f)
-                {
-                    needsCorner = false;
-                    CreateCorridor(exitA, exitB, corridorIndex, "Straight");
-                }
-                else
-                {
-                    corridorCorner = new Vector3((exitA.x + exitB.x) / 2f, exitA.y, exitA.z);
+                    // Both on X axis
+                    if (Mathf.Abs(exitA.z - exitB.z) < corridorWidth)
+                    {
+                        // Aligned - straight corridor
+                        CreateCorridor(exitA, exitB, corridorIndex, "Straight");
+                    }
+                    else
+                    {
+                        // L-shape: go X first, then Z
+                        float midX = (exitA.x + exitB.x) / 2f;
+                        Vector3 corner1 = new Vector3(midX, exitA.y, exitA.z);
+                        Vector3 corner2 = new Vector3(midX, exitA.y, exitB.z);
+                        CreateCorridor(exitA, corner1, corridorIndex, "Segment1");
+                        CreateCorridor(corner1, corner2, corridorIndex, "Segment2");
+                        CreateCorridor(corner2, exitB, corridorIndex, "Segment3");
+                        CreateCorridorCorner(corner1, corridorIndex);
+                        CreateCorridorCorner(corner2, corridorIndex);
+                    }
                 }
             }
             else
             {
-                // L-shaped corridor - corner at intersection of exit directions
-                corridorCorner = new Vector3(exitB.x, exitA.y, exitA.z);
-            }
-
-            if (needsCorner)
-            {
-                corridorCorner = new Vector3(exitB.x, exitA.y, exitA.z);
-                CreateCorridor(exitA, corridorCorner, corridorIndex, "Horizontal");
-                CreateCorridor(corridorCorner, exitB, corridorIndex, "Vertical");
-                CreateCorridorCorner(corridorCorner, corridorIndex);
+                // Walls on perpendicular axes - simple L-shape
+                Vector3 corner;
+                if (wallAIsNS)
+                {
+                    // A exits on Z, B exits on X -> corner at (exitA.x, y, exitB.z)
+                    corner = new Vector3(exitA.x, exitA.y, exitB.z);
+                }
+                else
+                {
+                    // A exits on X, B exits on Z -> corner at (exitB.x, y, exitA.z)
+                    corner = new Vector3(exitB.x, exitA.y, exitA.z);
+                }
+                CreateCorridor(exitA, corner, corridorIndex, "ToCorner");
+                CreateCorridor(corner, exitB, corridorIndex, "FromCorner");
+                CreateCorridorCorner(corner, corridorIndex);
             }
         }
 
