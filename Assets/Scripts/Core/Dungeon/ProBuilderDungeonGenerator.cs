@@ -22,6 +22,8 @@ namespace RpgTalentTree.Core.Dungeon
         [SerializeField] private float wallHeight = 3f;
         [SerializeField] private float wallThickness = 0.2f;
         [SerializeField] private int corridorWidth = 2;
+        [SerializeField] private bool useSplineCorridors = true;
+        [SerializeField] private int splineSegments = 8;
 
         [Header("Materials")]
         [SerializeField] private Material floorMaterial;
@@ -336,73 +338,15 @@ namespace RpgTalentTree.Core.Dungeon
             // Track room connectivity
             roomA.ConnectTo(roomB);
 
-            // Determine if walls are on same axis
-            bool wallAIsNS = (wallA == Doorway.WallSide.North || wallA == Doorway.WallSide.South);
-            bool wallBIsNS = (wallB == Doorway.WallSide.North || wallB == Doorway.WallSide.South);
-
-            if (wallAIsNS == wallBIsNS)
+            if (useSplineCorridors)
             {
-                // Both walls on same axis - may need simple L or straight corridor
-                if (wallAIsNS)
-                {
-                    // Both on Z axis
-                    if (Mathf.Abs(exitA.x - exitB.x) < corridorWidth)
-                    {
-                        // Aligned - straight corridor
-                        CreateCorridor(exitA, exitB, corridorIndex, "Straight");
-                    }
-                    else
-                    {
-                        // L-shape: go Z first, then X
-                        float midZ = (exitA.z + exitB.z) / 2f;
-                        Vector3 corner1 = new Vector3(exitA.x, exitA.y, midZ);
-                        Vector3 corner2 = new Vector3(exitB.x, exitA.y, midZ);
-                        CreateCorridor(exitA, corner1, corridorIndex, "Segment1");
-                        CreateCorridor(corner1, corner2, corridorIndex, "Segment2");
-                        CreateCorridor(corner2, exitB, corridorIndex, "Segment3");
-                        CreateCorridorCorner(corner1, corridorIndex);
-                        CreateCorridorCorner(corner2, corridorIndex);
-                    }
-                }
-                else
-                {
-                    // Both on X axis
-                    if (Mathf.Abs(exitA.z - exitB.z) < corridorWidth)
-                    {
-                        // Aligned - straight corridor
-                        CreateCorridor(exitA, exitB, corridorIndex, "Straight");
-                    }
-                    else
-                    {
-                        // L-shape: go X first, then Z
-                        float midX = (exitA.x + exitB.x) / 2f;
-                        Vector3 corner1 = new Vector3(midX, exitA.y, exitA.z);
-                        Vector3 corner2 = new Vector3(midX, exitA.y, exitB.z);
-                        CreateCorridor(exitA, corner1, corridorIndex, "Segment1");
-                        CreateCorridor(corner1, corner2, corridorIndex, "Segment2");
-                        CreateCorridor(corner2, exitB, corridorIndex, "Segment3");
-                        CreateCorridorCorner(corner1, corridorIndex);
-                        CreateCorridorCorner(corner2, corridorIndex);
-                    }
-                }
+                // Simple: just connect doorways with curved spline corridor
+                corridorGenerator.CreateSplineCorridor(exitA, dirA, exitB, dirB, dungeonParent.transform, corridorIndex, splineSegments);
             }
             else
             {
-                // Walls on perpendicular axes - simple L-shape
-                Vector3 corner;
-                if (wallAIsNS)
-                {
-                    // A exits on Z, B exits on X -> corner at (exitA.x, y, exitB.z)
-                    corner = new Vector3(exitA.x, exitA.y, exitB.z);
-                }
-                else
-                {
-                    // A exits on X, B exits on Z -> corner at (exitB.x, y, exitA.z)
-                    corner = new Vector3(exitB.x, exitA.y, exitA.z);
-                }
-                CreateCorridor(exitA, corner, corridorIndex, "ToCorner");
-                CreateCorridor(corner, exitB, corridorIndex, "FromCorner");
-                CreateCorridorCorner(corner, corridorIndex);
+                // Fallback: straight corridor (for testing)
+                CreateCorridor(exitA, exitB, corridorIndex, "Direct");
             }
         }
 
@@ -426,28 +370,28 @@ namespace RpgTalentTree.Core.Dungeon
             Vector3 stairsStart = new Vector3((exitA.x + exitB.x) / 2f, exitA.y, (exitA.z + exitB.z) / 2f);
             Vector3 stairsEnd = new Vector3(stairsStart.x, exitB.y, stairsStart.z);
 
-            // Create corridor from roomA exit to stairs (going outward)
-            CreateCorridor(exitA, stairsStart, corridorIndex, "ToStairs");
+            // Direction toward stairs from each exit
+            Vector3 toStairsA = (stairsStart - exitA).normalized;
+            Vector3 toStairsB = (stairsEnd - exitB).normalized;
 
-            // Create corner at stairs start if corridor changes direction
-            if (Mathf.Abs(exitA.x - stairsStart.x) > 0.1f && Mathf.Abs(exitA.z - stairsStart.z) > 0.1f)
+            if (useSplineCorridors)
             {
-                CreateCorridorCorner(stairsStart, corridorIndex);
+                // Spline corridor from roomA to stairs
+                corridorGenerator.CreateSplineCorridor(exitA, dirA, stairsStart, -toStairsA, dungeonParent.transform, corridorIndex, splineSegments / 2);
+
+                // Create stairs
+                if (stairsGenerator != null)
+                    stairsGenerator.CreateStairs(stairsStart, stairsEnd, dungeonParent.transform, corridorIndex);
+
+                // Spline corridor from stairs to roomB
+                corridorGenerator.CreateSplineCorridor(stairsEnd, toStairsB, exitB, dirB, dungeonParent.transform, corridorIndex, splineSegments / 2);
             }
-
-            // Create stairs from lower to higher level
-            if (stairsGenerator != null)
+            else
             {
-                stairsGenerator.CreateStairs(stairsStart, stairsEnd, dungeonParent.transform, corridorIndex);
-            }
-
-            // Create corridor from stairs end to roomB exit (going outward from B)
-            CreateCorridor(stairsEnd, exitB, corridorIndex, "FromStairs");
-
-            // Create corner at stairs end if corridor changes direction
-            if (Mathf.Abs(stairsEnd.x - exitB.x) > 0.1f && Mathf.Abs(stairsEnd.z - exitB.z) > 0.1f)
-            {
-                CreateCorridorCorner(stairsEnd, corridorIndex);
+                CreateCorridor(exitA, stairsStart, corridorIndex, "ToStairs");
+                if (stairsGenerator != null)
+                    stairsGenerator.CreateStairs(stairsStart, stairsEnd, dungeonParent.transform, corridorIndex);
+                CreateCorridor(stairsEnd, exitB, corridorIndex, "FromStairs");
             }
         }
 

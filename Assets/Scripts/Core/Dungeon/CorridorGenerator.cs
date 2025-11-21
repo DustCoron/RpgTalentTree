@@ -6,6 +6,7 @@ namespace RpgTalentTree.Core.Dungeon
 {
     /// <summary>
     /// Handles generation of corridors with walls and ceilings using ProBuilder API
+    /// Supports both straight and spline-based curved corridors
     /// </summary>
     public class CorridorGenerator
     {
@@ -24,6 +25,147 @@ namespace RpgTalentTree.Core.Dungeon
             this.wallHeight = wallHeight;
             this.wallThickness = wallThickness;
             this.corridorWidth = corridorWidth;
+        }
+
+        /// <summary>
+        /// Create a curved corridor using Bezier spline between two doorways
+        /// </summary>
+        public GameObject CreateSplineCorridor(Vector3 startPos, Vector3 startDir, Vector3 endPos, Vector3 endDir, Transform parent, int corridorIndex, int segments = 8)
+        {
+            if (Vector3.Distance(startPos, endPos) < 0.1f)
+                return null;
+
+            GameObject corridorObj = new GameObject($"SplineCorridor_{corridorIndex}");
+            corridorObj.transform.SetParent(parent);
+            corridorObj.transform.position = Vector3.zero;
+
+            // Calculate control points for cubic Bezier
+            float dist = Vector3.Distance(startPos, endPos);
+            float controlDist = dist * 0.4f; // Control point distance
+
+            Vector3 p0 = startPos;
+            Vector3 p1 = startPos + startDir * controlDist;
+            Vector3 p2 = endPos + endDir * controlDist;
+            Vector3 p3 = endPos;
+
+            // Generate spline points
+            List<Vector3> splinePoints = new List<Vector3>();
+            for (int i = 0; i <= segments; i++)
+            {
+                float t = i / (float)segments;
+                splinePoints.Add(CubicBezier(p0, p1, p2, p3, t));
+            }
+
+            // Create corridor mesh along spline
+            CreateSplineCorridorMesh(corridorObj, splinePoints);
+
+            return corridorObj;
+        }
+
+        /// <summary>
+        /// Cubic Bezier interpolation
+        /// </summary>
+        private Vector3 CubicBezier(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
+        {
+            float u = 1 - t;
+            float tt = t * t;
+            float uu = u * u;
+            float uuu = uu * u;
+            float ttt = tt * t;
+
+            return uuu * p0 + 3 * uu * t * p1 + 3 * u * tt * p2 + ttt * p3;
+        }
+
+        /// <summary>
+        /// Create corridor mesh along spline points
+        /// </summary>
+        private void CreateSplineCorridorMesh(GameObject parent, List<Vector3> splinePoints)
+        {
+            float halfWidth = corridorWidth / 2f;
+            List<Vector3> vertices = new List<Vector3>();
+            List<Face> faces = new List<Face>();
+
+            // Generate cross-sections along spline
+            List<Vector3> leftFloor = new List<Vector3>();
+            List<Vector3> rightFloor = new List<Vector3>();
+            List<Vector3> leftCeiling = new List<Vector3>();
+            List<Vector3> rightCeiling = new List<Vector3>();
+
+            for (int i = 0; i < splinePoints.Count; i++)
+            {
+                Vector3 pos = splinePoints[i];
+                Vector3 forward;
+
+                if (i < splinePoints.Count - 1)
+                    forward = (splinePoints[i + 1] - pos).normalized;
+                else
+                    forward = (pos - splinePoints[i - 1]).normalized;
+
+                Vector3 right = Vector3.Cross(Vector3.up, forward).normalized * halfWidth;
+
+                leftFloor.Add(pos - right);
+                rightFloor.Add(pos + right);
+                leftCeiling.Add(pos - right + Vector3.up * wallHeight);
+                rightCeiling.Add(pos + right + Vector3.up * wallHeight);
+            }
+
+            // Build floor quads
+            int vertOffset = 0;
+            for (int i = 0; i < splinePoints.Count - 1; i++)
+            {
+                vertices.Add(leftFloor[i]);
+                vertices.Add(rightFloor[i]);
+                vertices.Add(rightFloor[i + 1]);
+                vertices.Add(leftFloor[i + 1]);
+                faces.Add(new Face(new int[] { vertOffset, vertOffset + 3, vertOffset + 2, vertOffset, vertOffset + 2, vertOffset + 1 }));
+                vertOffset += 4;
+            }
+
+            // Build ceiling quads
+            for (int i = 0; i < splinePoints.Count - 1; i++)
+            {
+                vertices.Add(leftCeiling[i]);
+                vertices.Add(rightCeiling[i]);
+                vertices.Add(rightCeiling[i + 1]);
+                vertices.Add(leftCeiling[i + 1]);
+                faces.Add(new Face(new int[] { vertOffset, vertOffset + 1, vertOffset + 2, vertOffset, vertOffset + 2, vertOffset + 3 }));
+                vertOffset += 4;
+            }
+
+            // Build left wall quads
+            for (int i = 0; i < splinePoints.Count - 1; i++)
+            {
+                vertices.Add(leftFloor[i]);
+                vertices.Add(leftFloor[i + 1]);
+                vertices.Add(leftCeiling[i + 1]);
+                vertices.Add(leftCeiling[i]);
+                faces.Add(new Face(new int[] { vertOffset, vertOffset + 1, vertOffset + 2, vertOffset, vertOffset + 2, vertOffset + 3 }));
+                vertOffset += 4;
+            }
+
+            // Build right wall quads
+            for (int i = 0; i < splinePoints.Count - 1; i++)
+            {
+                vertices.Add(rightFloor[i]);
+                vertices.Add(rightFloor[i + 1]);
+                vertices.Add(rightCeiling[i + 1]);
+                vertices.Add(rightCeiling[i]);
+                faces.Add(new Face(new int[] { vertOffset, vertOffset + 3, vertOffset + 2, vertOffset, vertOffset + 2, vertOffset + 1 }));
+                vertOffset += 4;
+            }
+
+            // Create ProBuilder mesh
+            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices.ToArray(), faces.ToArray());
+            pbMesh.gameObject.transform.SetParent(parent.transform);
+            pbMesh.gameObject.transform.localPosition = Vector3.zero;
+            pbMesh.gameObject.name = "SplineMesh";
+
+            var renderer = pbMesh.GetComponent<MeshRenderer>();
+            if (renderer != null)
+                renderer.sharedMaterial = floorMaterial;
+
+            pbMesh.ToMesh();
+            pbMesh.Refresh();
         }
 
         /// <summary>
