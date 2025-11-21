@@ -22,8 +22,13 @@ namespace RpgTalentTree.Core.Dungeon
         [SerializeField] private float wallHeight = 3f;
         [SerializeField] private float wallThickness = 0.2f;
         [SerializeField] private int corridorWidth = 2;
-        [SerializeField] private bool useSplineCorridors = true;
-        [SerializeField] private int splineSegments = 8;
+
+        [Header("Corridor Style")]
+        [SerializeField] private bool useHardCorners = true;
+        [SerializeField] private int segmentsPerUnit = 2;
+        [Tooltip("Maximum corridors per room (1-4)")]
+        [Range(1, 4)]
+        [SerializeField] private int maxCorridorsPerRoom = 2;
 
         [Header("Materials")]
         [SerializeField] private Material floorMaterial;
@@ -330,54 +335,20 @@ namespace RpgTalentTree.Core.Dungeon
         /// </summary>
         private void ConnectRoomsSameLevel(DungeonRoom roomA, DungeonRoom roomB, int corridorIndex, Vector3 startPos, Vector3 endPos)
         {
-            // Get best available exit points from each room
-            var connectionA = roomA.GetBestConnectionPoint(roomB);
-            var connectionB = roomB.GetBestConnectionPoint(roomA);
-
-            // Skip if either room has no available walls
-            if (!connectionA.HasValue || !connectionB.HasValue)
+            // Check corridor limits
+            if (!CanAddCorridor(roomA) || !CanAddCorridor(roomB))
             {
-                Debug.Log($"Skipping corridor {corridorIndex}: no available walls");
+                Debug.Log($"Skipping corridor {corridorIndex}: max corridors reached");
                 return;
             }
 
-            var (wallA, exitA, dirA) = connectionA.Value;
-            var (wallB, exitB, dirB) = connectionB.Value;
-
-            // Reserve walls so they can't be used again
-            roomA.ReserveWall(wallA);
-            roomB.ReserveWall(wallB);
-
-            // Add doorways at the exit points
-            roomA.AddDoorway(exitA, corridorWidth);
-            roomB.AddDoorway(exitB, corridorWidth);
-
-            // Track room connectivity
-            roomA.ConnectTo(roomB);
-
-            if (useSplineCorridors)
-            {
-                corridorGenerator.CreateSplineCorridor(exitA, dirA, exitB, dirB, dungeonParent.transform, corridorIndex, splineSegments);
-            }
-            else
-            {
-                CreateCorridor(exitA, exitB, corridorIndex, "Direct");
-            }
-        }
-
-        /// <summary>
-        /// Connect two rooms at different heights with stairs
-        /// </summary>
-        private void ConnectRoomsWithStairs(DungeonRoom roomA, DungeonRoom roomB, int corridorIndex, Vector3 startPos, Vector3 endPos)
-        {
             // Get best available exit points from each room
             var connectionA = roomA.GetBestConnectionPoint(roomB);
             var connectionB = roomB.GetBestConnectionPoint(roomA);
 
-            // Skip if either room has no available walls
             if (!connectionA.HasValue || !connectionB.HasValue)
             {
-                Debug.Log($"Skipping stairs corridor {corridorIndex}: no available walls");
+                Debug.Log($"Skipping corridor {corridorIndex}: no available walls");
                 return;
             }
 
@@ -388,34 +359,81 @@ namespace RpgTalentTree.Core.Dungeon
             roomA.ReserveWall(wallA);
             roomB.ReserveWall(wallB);
 
-            // Add doorways at the exit points
+            // Add doorways
             roomA.AddDoorway(exitA, corridorWidth);
             roomB.AddDoorway(exitB, corridorWidth);
 
-            // Track room connectivity
+            // Track connectivity
             roomA.ConnectTo(roomB);
 
-            // Calculate stairs position - midpoint between exits
-            Vector3 stairsStart = new Vector3((exitA.x + exitB.x) / 2f, exitA.y, (exitA.z + exitB.z) / 2f);
-            Vector3 stairsEnd = new Vector3(stairsStart.x, exitB.y, stairsStart.z);
-
-            // Direction toward stairs from each exit
-            Vector3 toStairsA = (stairsStart - exitA).normalized;
-            Vector3 toStairsB = (stairsEnd - exitB).normalized;
-
-            if (useSplineCorridors)
+            // Create corridor with appropriate style
+            if (useHardCorners)
             {
-                corridorGenerator.CreateSplineCorridor(exitA, dirA, stairsStart, -toStairsA, dungeonParent.transform, corridorIndex, splineSegments / 2);
-                if (stairsGenerator != null)
-                    stairsGenerator.CreateStairs(stairsStart, stairsEnd, dungeonParent.transform, corridorIndex);
-                corridorGenerator.CreateSplineCorridor(stairsEnd, toStairsB, exitB, dirB, dungeonParent.transform, corridorIndex, splineSegments / 2);
+                corridorGenerator.CreateLShapedCorridor(exitA, dirA, exitB, dirB, dungeonParent.transform, corridorIndex, segmentsPerUnit);
             }
             else
             {
-                CreateCorridor(exitA, stairsStart, corridorIndex, "ToStairs");
+                corridorGenerator.CreateSplineCorridor(exitA, dirA, exitB, dirB, dungeonParent.transform, corridorIndex, segmentsPerUnit * 4);
+            }
+        }
+
+        /// <summary>
+        /// Check if room can accept more corridors
+        /// </summary>
+        private bool CanAddCorridor(DungeonRoom room)
+        {
+            return room.ConnectedRoomIds.Count < maxCorridorsPerRoom && room.GetAvailableWallCount() > 0;
+        }
+
+        /// <summary>
+        /// Connect two rooms at different heights with stairs
+        /// </summary>
+        private void ConnectRoomsWithStairs(DungeonRoom roomA, DungeonRoom roomB, int corridorIndex, Vector3 startPos, Vector3 endPos)
+        {
+            // Check corridor limits
+            if (!CanAddCorridor(roomA) || !CanAddCorridor(roomB))
+            {
+                Debug.Log($"Skipping stairs {corridorIndex}: max corridors reached");
+                return;
+            }
+
+            var connectionA = roomA.GetBestConnectionPoint(roomB);
+            var connectionB = roomB.GetBestConnectionPoint(roomA);
+
+            if (!connectionA.HasValue || !connectionB.HasValue)
+            {
+                Debug.Log($"Skipping stairs {corridorIndex}: no available walls");
+                return;
+            }
+
+            var (wallA, exitA, dirA) = connectionA.Value;
+            var (wallB, exitB, dirB) = connectionB.Value;
+
+            roomA.ReserveWall(wallA);
+            roomB.ReserveWall(wallB);
+            roomA.AddDoorway(exitA, corridorWidth);
+            roomB.AddDoorway(exitB, corridorWidth);
+            roomA.ConnectTo(roomB);
+
+            // Calculate stairs position
+            Vector3 stairsStart = new Vector3((exitA.x + exitB.x) / 2f, exitA.y, (exitA.z + exitB.z) / 2f);
+            Vector3 stairsEnd = new Vector3(stairsStart.x, exitB.y, stairsStart.z);
+            Vector3 toStairsA = (stairsStart - exitA).normalized;
+            Vector3 toStairsB = (stairsEnd - exitB).normalized;
+
+            if (useHardCorners)
+            {
+                corridorGenerator.CreateLShapedCorridor(exitA, dirA, stairsStart, -toStairsA, dungeonParent.transform, corridorIndex, segmentsPerUnit);
                 if (stairsGenerator != null)
                     stairsGenerator.CreateStairs(stairsStart, stairsEnd, dungeonParent.transform, corridorIndex);
-                CreateCorridor(stairsEnd, exitB, corridorIndex, "FromStairs");
+                corridorGenerator.CreateLShapedCorridor(stairsEnd, toStairsB, exitB, dirB, dungeonParent.transform, corridorIndex, segmentsPerUnit);
+            }
+            else
+            {
+                corridorGenerator.CreateSplineCorridor(exitA, dirA, stairsStart, -toStairsA, dungeonParent.transform, corridorIndex, segmentsPerUnit * 2);
+                if (stairsGenerator != null)
+                    stairsGenerator.CreateStairs(stairsStart, stairsEnd, dungeonParent.transform, corridorIndex);
+                corridorGenerator.CreateSplineCorridor(stairsEnd, toStairsB, exitB, dirB, dungeonParent.transform, corridorIndex, segmentsPerUnit * 2);
             }
         }
 

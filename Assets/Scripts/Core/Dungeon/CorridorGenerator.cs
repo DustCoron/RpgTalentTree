@@ -57,14 +57,109 @@ namespace RpgTalentTree.Core.Dungeon
         public List<Vector3> GetJunctionPoints() => junctionPoints;
 
         /// <summary>
-        /// Create a curved corridor using Bezier spline, checking for intersections
+        /// Create an L-shaped corridor with hard corners but consistent polygon density
+        /// </summary>
+        public GameObject CreateLShapedCorridor(Vector3 startPos, Vector3 startDir, Vector3 endPos, Vector3 endDir, Transform parent, int corridorIndex, int segmentsPerUnit = 2)
+        {
+            if (Vector3.Distance(startPos, endPos) < 0.1f)
+                return null;
+
+            // Calculate corner point for L-shape
+            Vector3 corner = CalculateCornerPoint(startPos, startDir, endPos, endDir);
+
+            // Generate path points with consistent density
+            List<Vector3> pathPoints = GenerateLShapePath(startPos, corner, endPos, segmentsPerUnit);
+
+            // Check for intersections
+            List<Vector3> intersections = FindIntersections(pathPoints);
+            foreach (var intersection in intersections)
+            {
+                bool exists = junctionPoints.Exists(p => Vector3.Distance(p, intersection) < corridorWidth);
+                if (!exists)
+                    junctionPoints.Add(intersection);
+            }
+
+            // Create corridor mesh
+            GameObject corridorObj = new GameObject($"LCorridor_{corridorIndex}");
+            corridorObj.transform.SetParent(parent);
+            corridorObj.transform.position = Vector3.zero;
+
+            CreateSplineCorridorMesh(corridorObj, pathPoints);
+
+            // Store path
+            corridorPaths.Add(new CorridorPath(pathPoints, corridorIndex, corridorObj));
+
+            return corridorObj;
+        }
+
+        /// <summary>
+        /// Calculate the corner point for an L-shaped corridor
+        /// </summary>
+        private Vector3 CalculateCornerPoint(Vector3 start, Vector3 startDir, Vector3 end, Vector3 endDir)
+        {
+            // Determine corner based on primary directions
+            bool startIsHorizontal = Mathf.Abs(startDir.x) > Mathf.Abs(startDir.z);
+            bool endIsHorizontal = Mathf.Abs(endDir.x) > Mathf.Abs(endDir.z);
+
+            if (startIsHorizontal != endIsHorizontal)
+            {
+                // Perpendicular - simple L-shape
+                if (startIsHorizontal)
+                    return new Vector3(end.x, start.y, start.z);
+                else
+                    return new Vector3(start.x, start.y, end.z);
+            }
+            else
+            {
+                // Same axis - use midpoint for U-shape
+                if (startIsHorizontal)
+                    return new Vector3((start.x + end.x) / 2f, start.y, (start.z + end.z) / 2f);
+                else
+                    return new Vector3((start.x + end.x) / 2f, start.y, (start.z + end.z) / 2f);
+            }
+        }
+
+        /// <summary>
+        /// Generate evenly spaced points along an L-shaped path
+        /// </summary>
+        private List<Vector3> GenerateLShapePath(Vector3 start, Vector3 corner, Vector3 end, int segmentsPerUnit)
+        {
+            List<Vector3> points = new List<Vector3>();
+
+            float dist1 = Vector3.Distance(start, corner);
+            float dist2 = Vector3.Distance(corner, end);
+            float totalDist = dist1 + dist2;
+
+            // Calculate segment count based on distance
+            int totalSegments = Mathf.Max(4, Mathf.RoundToInt(totalDist * segmentsPerUnit));
+            int seg1 = Mathf.Max(2, Mathf.RoundToInt(totalSegments * (dist1 / totalDist)));
+            int seg2 = Mathf.Max(2, totalSegments - seg1);
+
+            // First segment: start to corner
+            for (int i = 0; i <= seg1; i++)
+            {
+                float t = i / (float)seg1;
+                points.Add(Vector3.Lerp(start, corner, t));
+            }
+
+            // Second segment: corner to end (skip first point to avoid duplicate)
+            for (int i = 1; i <= seg2; i++)
+            {
+                float t = i / (float)seg2;
+                points.Add(Vector3.Lerp(corner, end, t));
+            }
+
+            return points;
+        }
+
+        /// <summary>
+        /// Create a curved corridor using Bezier spline (kept for compatibility)
         /// </summary>
         public GameObject CreateSplineCorridor(Vector3 startPos, Vector3 startDir, Vector3 endPos, Vector3 endDir, Transform parent, int corridorIndex, int segments = 8)
         {
             if (Vector3.Distance(startPos, endPos) < 0.1f)
                 return null;
 
-            // Calculate control points for cubic Bezier
             float dist = Vector3.Distance(startPos, endPos);
             float controlDist = dist * 0.4f;
 
@@ -73,7 +168,6 @@ namespace RpgTalentTree.Core.Dungeon
             Vector3 p2 = endPos + endDir * controlDist;
             Vector3 p3 = endPos;
 
-            // Generate spline points
             List<Vector3> splinePoints = new List<Vector3>();
             for (int i = 0; i <= segments; i++)
             {
@@ -81,33 +175,19 @@ namespace RpgTalentTree.Core.Dungeon
                 splinePoints.Add(CubicBezier(p0, p1, p2, p3, t));
             }
 
-            // Check for intersections with existing corridors
             List<Vector3> intersections = FindIntersections(splinePoints);
-
-            // Add new junctions
             foreach (var intersection in intersections)
             {
-                bool exists = false;
-                foreach (var existing in junctionPoints)
-                {
-                    if (Vector3.Distance(existing, intersection) < corridorWidth)
-                    {
-                        exists = true;
-                        break;
-                    }
-                }
+                bool exists = junctionPoints.Exists(p => Vector3.Distance(p, intersection) < corridorWidth);
                 if (!exists)
                     junctionPoints.Add(intersection);
             }
 
-            // Create corridor mesh
             GameObject corridorObj = new GameObject($"SplineCorridor_{corridorIndex}");
             corridorObj.transform.SetParent(parent);
             corridorObj.transform.position = Vector3.zero;
 
             CreateSplineCorridorMesh(corridorObj, splinePoints);
-
-            // Store path for future intersection checks
             corridorPaths.Add(new CorridorPath(splinePoints, corridorIndex, corridorObj));
 
             return corridorObj;
