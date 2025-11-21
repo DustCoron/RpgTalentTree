@@ -29,6 +29,8 @@ namespace RpgTalentTree.Core.Dungeon
         [Tooltip("Maximum corridors per room (1-4)")]
         [Range(1, 4)]
         [SerializeField] private int maxCorridorsPerRoom = 2;
+        [Tooltip("Maximum length before adding extra 90-degree corners")]
+        [SerializeField] private float maxCorridorSegmentLength = 15f;
 
         [Header("Materials")]
         [SerializeField] private Material floorMaterial;
@@ -113,7 +115,11 @@ namespace RpgTalentTree.Core.Dungeon
             ClearDungeon();
             InitializeGenerator();
             GenerateRooms();
+
+            // Setup corridor generator with room collision data
             corridorGenerator?.ClearPaths();
+            RegisterRoomBoundsForCorridors();
+
             GenerateCorridorsAndDoorways();
             corridorGenerator?.CreateJunctions(dungeonParent.transform);
             CreateRoomMeshes();
@@ -122,6 +128,30 @@ namespace RpgTalentTree.Core.Dungeon
             OptimizeMeshes();
             int junctionCount = corridorGenerator?.GetJunctionPoints().Count ?? 0;
             Debug.Log($"Dungeon generated with {rooms.Count} rooms, {dungeonMarkers.Count} markers, {junctionCount} junctions");
+        }
+
+        /// <summary>
+        /// Register all room bounds with corridor generator for collision avoidance
+        /// </summary>
+        private void RegisterRoomBoundsForCorridors()
+        {
+            if (corridorGenerator == null) return;
+
+            // Set max segment length
+            corridorGenerator.SetMaxSegmentLength(maxCorridorSegmentLength);
+
+            foreach (var room in rooms)
+            {
+                // Create bounds for room
+                Vector3 center = new Vector3(
+                    room.Position.x + room.Size.x / 2f,
+                    room.FloorHeight + wallHeight / 2f,
+                    room.Position.z + room.Size.z / 2f
+                );
+                Vector3 size = new Vector3(room.Size.x, wallHeight, room.Size.z);
+                Bounds bounds = new Bounds(center, size);
+                corridorGenerator.RegisterRoomBounds(bounds);
+            }
         }
 
         /// <summary>

@@ -38,6 +38,12 @@ namespace RpgTalentTree.Core.Dungeon
         private List<CorridorPath> corridorPaths = new List<CorridorPath>();
         private List<Vector3> junctionPoints = new List<Vector3>();
 
+        // Room bounds for collision avoidance
+        private List<Bounds> roomBounds = new List<Bounds>();
+        private float maxSegmentLength = 15f;
+
+        public void SetMaxSegmentLength(float length) => maxSegmentLength = length;
+
         public CorridorGenerator(Material floorMaterial, Material wallMaterial, Material ceilingMaterial, float wallHeight, float wallThickness, int corridorWidth)
         {
             this.floorMaterial = floorMaterial;
@@ -52,23 +58,65 @@ namespace RpgTalentTree.Core.Dungeon
         {
             corridorPaths.Clear();
             junctionPoints.Clear();
+            roomBounds.Clear();
         }
 
         public List<Vector3> GetJunctionPoints() => junctionPoints;
 
         /// <summary>
-        /// Create an L-shaped corridor with hard corners but consistent polygon density
+        /// Register room bounds for collision avoidance
+        /// </summary>
+        public void RegisterRoomBounds(Bounds bounds)
+        {
+            // Expand bounds slightly for corridor clearance
+            bounds.Expand(corridorWidth * 0.5f);
+            roomBounds.Add(bounds);
+        }
+
+        /// <summary>
+        /// Check if a point is inside any room
+        /// </summary>
+        private bool IsInsideAnyRoom(Vector3 point)
+        {
+            foreach (var bounds in roomBounds)
+            {
+                if (bounds.Contains(point))
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Check if a line segment intersects any room
+        /// </summary>
+        private bool SegmentIntersectsRoom(Vector3 start, Vector3 end)
+        {
+            int steps = Mathf.CeilToInt(Vector3.Distance(start, end) / (corridorWidth * 0.5f));
+            for (int i = 1; i < steps; i++)
+            {
+                Vector3 point = Vector3.Lerp(start, end, i / (float)steps);
+                if (IsInsideAnyRoom(point))
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Create an L-shaped corridor with hard corners, room avoidance, and long segment splitting
         /// </summary>
         public GameObject CreateLShapedCorridor(Vector3 startPos, Vector3 startDir, Vector3 endPos, Vector3 endDir, Transform parent, int corridorIndex, int segmentsPerUnit = 2)
         {
             if (Vector3.Distance(startPos, endPos) < 0.1f)
                 return null;
 
-            // Calculate corner point for L-shape
-            Vector3 corner = CalculateCornerPoint(startPos, startDir, endPos, endDir);
+            // Calculate waypoints with room avoidance
+            List<Vector3> waypoints = CalculateCorridorWaypoints(startPos, startDir, endPos, endDir);
 
             // Generate path points with consistent density
-            List<Vector3> pathPoints = GenerateLShapePath(startPos, corner, endPos, segmentsPerUnit);
+            List<Vector3> pathPoints = GenerateMultiCornerPath(waypoints, segmentsPerUnit);
+
+            // Validate path doesn't go through rooms
+            pathPoints = ValidatePathAgainstRooms(pathPoints);
 
             // Check for intersections
             List<Vector3> intersections = FindIntersections(pathPoints);
@@ -85,11 +133,116 @@ namespace RpgTalentTree.Core.Dungeon
             corridorObj.transform.position = Vector3.zero;
 
             CreateSplineCorridorMesh(corridorObj, pathPoints);
-
-            // Store path
             corridorPaths.Add(new CorridorPath(pathPoints, corridorIndex, corridorObj));
 
             return corridorObj;
+        }
+
+        /// <summary>
+        /// Calculate waypoints including extra corners for long segments
+        /// </summary>
+        private List<Vector3> CalculateCorridorWaypoints(Vector3 start, Vector3 startDir, Vector3 end, Vector3 endDir)
+        {
+            List<Vector3> waypoints = new List<Vector3> { start };
+
+            // Calculate initial corner
+            Vector3 corner = CalculateCornerPoint(start, startDir, end, endDir);
+
+            // Check if first segment is too long - add extra corner
+            float dist1 = Vector3.Distance(start, corner);
+            if (dist1 > maxSegmentLength)
+            {
+                int extraCorners = Mathf.FloorToInt(dist1 / maxSegmentLength);
+                Vector3 dir1 = (corner - start).normalized;
+                for (int i = 1; i <= extraCorners; i++)
+                {
+                    Vector3 extraCorner = start + dir1 * (maxSegmentLength * i);
+                    // Offset perpendicular to avoid straight line
+                    Vector3 perp = Vector3.Cross(dir1, Vector3.up).normalized;
+                    extraCorner += perp * corridorWidth * ((i % 2 == 0) ? 1 : -1);
+                    waypoints.Add(extraCorner);
+                }
+            }
+
+            waypoints.Add(corner);
+
+            // Check if second segment is too long
+            float dist2 = Vector3.Distance(corner, end);
+            if (dist2 > maxSegmentLength)
+            {
+                int extraCorners = Mathf.FloorToInt(dist2 / maxSegmentLength);
+                Vector3 dir2 = (end - corner).normalized;
+                for (int i = 1; i <= extraCorners; i++)
+                {
+                    Vector3 extraCorner = corner + dir2 * (maxSegmentLength * i);
+                    Vector3 perp = Vector3.Cross(dir2, Vector3.up).normalized;
+                    extraCorner += perp * corridorWidth * ((i % 2 == 0) ? 1 : -1);
+                    waypoints.Add(extraCorner);
+                }
+            }
+
+            waypoints.Add(end);
+            return waypoints;
+        }
+
+        /// <summary>
+        /// Generate path points along multiple waypoints
+        /// </summary>
+        private List<Vector3> GenerateMultiCornerPath(List<Vector3> waypoints, int segmentsPerUnit)
+        {
+            List<Vector3> points = new List<Vector3>();
+
+            for (int w = 0; w < waypoints.Count - 1; w++)
+            {
+                Vector3 segStart = waypoints[w];
+                Vector3 segEnd = waypoints[w + 1];
+                float dist = Vector3.Distance(segStart, segEnd);
+                int segments = Mathf.Max(2, Mathf.RoundToInt(dist * segmentsPerUnit));
+
+                int startIdx = (w == 0) ? 0 : 1; // Skip first point for subsequent segments
+                for (int i = startIdx; i <= segments; i++)
+                {
+                    float t = i / (float)segments;
+                    points.Add(Vector3.Lerp(segStart, segEnd, t));
+                }
+            }
+
+            return points;
+        }
+
+        /// <summary>
+        /// Adjust path points that intersect with rooms
+        /// </summary>
+        private List<Vector3> ValidatePathAgainstRooms(List<Vector3> pathPoints)
+        {
+            List<Vector3> validPath = new List<Vector3>();
+
+            for (int i = 0; i < pathPoints.Count; i++)
+            {
+                Vector3 point = pathPoints[i];
+
+                // If point is inside a room, try to push it out
+                if (IsInsideAnyRoom(point) && i > 0 && i < pathPoints.Count - 1)
+                {
+                    // Try to offset perpendicular to path direction
+                    Vector3 dir = (pathPoints[Mathf.Min(i + 1, pathPoints.Count - 1)] - pathPoints[Mathf.Max(i - 1, 0)]).normalized;
+                    Vector3 perp = Vector3.Cross(dir, Vector3.up).normalized;
+
+                    // Try both directions
+                    Vector3 offset1 = point + perp * corridorWidth * 2;
+                    Vector3 offset2 = point - perp * corridorWidth * 2;
+
+                    if (!IsInsideAnyRoom(offset1))
+                        point = offset1;
+                    else if (!IsInsideAnyRoom(offset2))
+                        point = offset2;
+                    // If both fail, keep original (will overlap but at least connects)
+                }
+
+                validPath.Add(point);
+            }
+
+            return validPath;
         }
 
         /// <summary>
