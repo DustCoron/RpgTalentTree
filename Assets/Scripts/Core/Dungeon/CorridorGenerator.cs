@@ -102,21 +102,24 @@ namespace RpgTalentTree.Core.Dungeon
         }
 
         /// <summary>
-        /// Create an L-shaped corridor with hard corners, room avoidance, and long segment splitting
+        /// Create an L-shaped corridor with strict room avoidance
         /// </summary>
         public GameObject CreateLShapedCorridor(Vector3 startPos, Vector3 startDir, Vector3 endPos, Vector3 endDir, Transform parent, int corridorIndex, int segmentsPerUnit = 2)
         {
             if (Vector3.Distance(startPos, endPos) < 0.1f)
                 return null;
 
-            // Calculate simple L-shape waypoints
-            List<Vector3> waypoints = CalculateSimpleLPath(startPos, startDir, endPos, endDir);
+            // Calculate path that avoids all rooms (except at start/end doorways)
+            List<Vector3> waypoints = CalculateRoomAvoidingPath(startPos, startDir, endPos, endDir);
 
-            // Validate waypoints don't go through rooms
-            waypoints = ValidateWaypointsAgainstRooms(waypoints);
+            if (waypoints.Count < 2)
+                return null;
 
-            // Generate path with minimal segments (just enough for smooth corners)
+            // Generate path with minimal segments
             List<Vector3> pathPoints = GenerateCleanPath(waypoints);
+
+            // Final validation - remove any points inside rooms (except endpoints)
+            pathPoints = StrictRoomAvoidance(pathPoints);
 
             // Check for intersections
             List<Vector3> intersections = FindIntersections(pathPoints);
@@ -139,69 +142,138 @@ namespace RpgTalentTree.Core.Dungeon
         }
 
         /// <summary>
-        /// Calculate simple L-shaped path with optional dog-leg for long segments
+        /// Calculate a path that strictly avoids all room interiors
         /// </summary>
-        private List<Vector3> CalculateSimpleLPath(Vector3 start, Vector3 startDir, Vector3 end, Vector3 endDir)
+        private List<Vector3> CalculateRoomAvoidingPath(Vector3 start, Vector3 startDir, Vector3 end, Vector3 endDir)
         {
-            List<Vector3> waypoints = new List<Vector3> { start };
+            List<Vector3> waypoints = new List<Vector3>();
 
-            Vector3 corner = CalculateCornerPoint(start, startDir, end, endDir);
-            float totalDist = Vector3.Distance(start, corner) + Vector3.Distance(corner, end);
+            // Start point (at doorway - allowed to touch room)
+            waypoints.Add(start);
 
-            // Only add dog-leg if corridor is very long
-            if (totalDist > maxSegmentLength * 2)
+            // Move out from doorway first (clearance point)
+            Vector3 startClearance = start + startDir * (corridorWidth + 1);
+            waypoints.Add(startClearance);
+
+            // End clearance point
+            Vector3 endClearance = end + endDir * (corridorWidth + 1);
+
+            // Calculate corner that avoids rooms
+            Vector3 corner = FindSafeCorner(startClearance, endClearance, startDir, endDir);
+
+            // Check if direct path is blocked
+            if (SegmentIntersectsRoom(startClearance, corner) || SegmentIntersectsRoom(corner, endClearance))
             {
-                // Add single dog-leg in the middle
-                Vector3 mid = (start + end) / 2f;
-                Vector3 dir = (end - start).normalized;
-                Vector3 perp = Vector3.Cross(dir, Vector3.up).normalized;
-
-                Vector3 dogLeg1 = mid + perp * corridorWidth * 3;
-                Vector3 dogLeg2 = mid + perp * corridorWidth * 3 + dir * corridorWidth * 2;
-
-                waypoints.Add(dogLeg1);
-                waypoints.Add(dogLeg2);
+                // Try to route around - find alternative corner
+                corner = FindAlternativeCorner(startClearance, endClearance, startDir, endDir);
             }
-            else
+
+            // Only add corner if it's different from start/end clearance
+            if (Vector3.Distance(corner, startClearance) > 1f && Vector3.Distance(corner, endClearance) > 1f)
             {
                 waypoints.Add(corner);
             }
 
+            waypoints.Add(endClearance);
             waypoints.Add(end);
+
             return waypoints;
         }
 
         /// <summary>
-        /// Validate waypoints don't pass through rooms
+        /// Find a safe corner position that doesn't intersect rooms
         /// </summary>
-        private List<Vector3> ValidateWaypointsAgainstRooms(List<Vector3> waypoints)
+        private Vector3 FindSafeCorner(Vector3 start, Vector3 end, Vector3 startDir, Vector3 endDir)
         {
-            List<Vector3> valid = new List<Vector3>();
+            // Try standard L-shape corner first
+            Vector3 corner = CalculateCornerPoint(start, startDir, end, endDir);
 
-            for (int i = 0; i < waypoints.Count; i++)
+            if (!IsInsideAnyRoom(corner))
+                return corner;
+
+            // Try alternative corners
+            Vector3[] alternatives = {
+                new Vector3(start.x, start.y, end.z),
+                new Vector3(end.x, start.y, start.z),
+                new Vector3((start.x + end.x) / 2f, start.y, start.z),
+                new Vector3(start.x, start.y, (start.z + end.z) / 2f),
+            };
+
+            foreach (var alt in alternatives)
             {
-                Vector3 point = waypoints[i];
+                if (!IsInsideAnyRoom(alt))
+                    return alt;
+            }
 
-                // Don't modify start/end points
-                if (i == 0 || i == waypoints.Count - 1)
+            return corner; // Return original if nothing better found
+        }
+
+        /// <summary>
+        /// Find alternative corner by routing around rooms
+        /// </summary>
+        private Vector3 FindAlternativeCorner(Vector3 start, Vector3 end, Vector3 startDir, Vector3 endDir)
+        {
+            // Try routing with offset to avoid rooms
+            Vector3 dir = (end - start).normalized;
+            Vector3 perp = Vector3.Cross(dir, Vector3.up).normalized;
+
+            // Try both sides with increasing offset
+            for (float offset = corridorWidth * 2; offset <= corridorWidth * 10; offset += corridorWidth * 2)
+            {
+                Vector3 midPoint = (start + end) / 2f;
+
+                // Try positive offset
+                Vector3 corner1 = midPoint + perp * offset;
+                if (!IsInsideAnyRoom(corner1) &&
+                    !SegmentIntersectsRoom(start, corner1) &&
+                    !SegmentIntersectsRoom(corner1, end))
                 {
-                    valid.Add(point);
-                    continue;
+                    return corner1;
                 }
 
-                // Push middle points out of rooms
-                if (IsInsideAnyRoom(point))
+                // Try negative offset
+                Vector3 corner2 = midPoint - perp * offset;
+                if (!IsInsideAnyRoom(corner2) &&
+                    !SegmentIntersectsRoom(start, corner2) &&
+                    !SegmentIntersectsRoom(corner2, end))
                 {
-                    Vector3 pushed = PushPointOutOfRooms(point);
-                    valid.Add(pushed);
-                }
-                else
-                {
-                    valid.Add(point);
+                    return corner2;
                 }
             }
 
-            return valid;
+            // Fallback to original calculation
+            return CalculateCornerPoint(start, startDir, end, endDir);
+        }
+
+        /// <summary>
+        /// Final pass to ensure no corridor points are inside rooms (except first/last)
+        /// </summary>
+        private List<Vector3> StrictRoomAvoidance(List<Vector3> pathPoints)
+        {
+            if (pathPoints.Count < 3) return pathPoints;
+
+            List<Vector3> result = new List<Vector3> { pathPoints[0] }; // Keep start
+
+            for (int i = 1; i < pathPoints.Count - 1; i++)
+            {
+                Vector3 point = pathPoints[i];
+
+                if (IsInsideAnyRoom(point))
+                {
+                    // Push point out of room
+                    Vector3 pushed = PushPointOutOfRooms(point);
+                    if (!IsInsideAnyRoom(pushed))
+                        result.Add(pushed);
+                    // Skip point if can't push out
+                }
+                else
+                {
+                    result.Add(point);
+                }
+            }
+
+            result.Add(pathPoints[pathPoints.Count - 1]); // Keep end
+            return result;
         }
 
         /// <summary>
