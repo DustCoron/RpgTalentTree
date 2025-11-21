@@ -579,17 +579,16 @@ namespace RpgTalentTree.Core.Dungeon
 
             Debug.Log($"Optimizing dungeon: Combining {allMeshes.Count} meshes...");
 
-            // Use ProBuilder's CombineMeshes to merge all meshes
-            List<ProBuilderMesh> combinedMeshes = CombineMeshes.Combine(allMeshes);
+            // Create a target mesh for combining
+            GameObject targetObj = new GameObject("CombinedDungeonMesh");
+            targetObj.transform.SetParent(dungeonParent.transform);
+            targetObj.transform.localPosition = Vector3.zero;
+            ProBuilderMesh targetMesh = targetObj.AddComponent<ProBuilderMesh>();
 
-            Debug.Log($"Optimization complete: Reduced to {combinedMeshes.Count} mesh(es)");
+            // Use ProBuilder's CombineMeshes to merge all meshes into target
+            List<ProBuilderMesh> combinedMeshes = CombineMeshes.Combine(allMeshes, targetMesh);
 
-            // Parent combined meshes to dungeon
-            foreach (var mesh in combinedMeshes)
-            {
-                mesh.transform.SetParent(dungeonParent.transform);
-                mesh.gameObject.name = "CombinedDungeonMesh";
-            }
+            Debug.Log($"Optimization complete: Meshes combined into {combinedMeshes.Count} mesh(es)");
         }
 
         private void OnValidate()
