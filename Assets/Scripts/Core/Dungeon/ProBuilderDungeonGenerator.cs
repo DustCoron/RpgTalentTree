@@ -30,10 +30,13 @@ namespace RpgTalentTree.Core.Dungeon
         [SerializeField] private Material stairMaterial;
 
         [Header("Multi-Level Settings")]
-        [SerializeField] private bool enableMultiLevel = false;
+        [SerializeField] private bool enableMultiLevel = true;  // Enabled by default for stairs
         [SerializeField] private float minFloorHeight = 0f;
-        [SerializeField] private float maxFloorHeight = 6f;
+        [SerializeField] private float maxFloorHeight = 9f;     // Increased from 6f for more variation
         [SerializeField] private float floorHeightStep = 3f;
+        [Tooltip("Probability (0-1) that adjacent rooms will be on different levels")]
+        [Range(0f, 1f)]
+        [SerializeField] private float heightVariationChance = 0.4f;  // 40% chance of height difference
         [SerializeField] private bool enableStairs = true;
         [SerializeField] private float stepHeight = 0.2f;
         [SerializeField] private float stepDepth = 0.5f;
@@ -158,15 +161,26 @@ namespace RpgTalentTree.Core.Dungeon
             List<BSPNode> leaves = new List<BSPNode>();
             bspRoot.GetLeaves(leaves);
 
+            // Assign heights to rooms with controlled variation
+            float currentHeight = minFloorHeight;
+            int heightLevels = enableMultiLevel ? Mathf.FloorToInt((maxFloorHeight - minFloorHeight) / floorHeightStep) + 1 : 1;
+
             foreach (var leaf in leaves)
             {
-                // Generate random floor height if multi-level is enabled
+                // Generate floor height with controlled randomness
                 float floorHeight = 0f;
                 if (enableMultiLevel)
                 {
-                    int heightLevels = Mathf.FloorToInt((maxFloorHeight - minFloorHeight) / floorHeightStep) + 1;
-                    int randomLevel = random.Next(0, heightLevels);
-                    floorHeight = minFloorHeight + (randomLevel * floorHeightStep);
+                    // Use heightVariationChance to control level changes
+                    if (random.NextDouble() < heightVariationChance)
+                    {
+                        // Change to a different random level
+                        int randomLevel = random.Next(0, heightLevels);
+                        currentHeight = minFloorHeight + (randomLevel * floorHeightStep);
+                    }
+                    // else keep currentHeight (creates clusters of same-height rooms)
+
+                    floorHeight = currentHeight;
                 }
 
                 leaf.CreateRoom(random, minRoomSize, maxRoomSize, floorHeight);
@@ -782,6 +796,7 @@ namespace RpgTalentTree.Core.Dungeon
             // Clamp multi-level settings
             maxFloorHeight = Mathf.Max(minFloorHeight, maxFloorHeight);
             floorHeightStep = Mathf.Max(0.5f, floorHeightStep);
+            heightVariationChance = Mathf.Clamp01(heightVariationChance);
             stepHeight = Mathf.Clamp(stepHeight, 0.1f, 0.5f);
             stepDepth = Mathf.Clamp(stepDepth, 0.3f, 1f);
         }
