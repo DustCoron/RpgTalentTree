@@ -53,7 +53,7 @@ namespace RpgTalentTree.Core.Dungeon
 
             // Use ProBuilder's built-in stair generator
             ProBuilderMesh stairMesh = ShapeGenerator.GenerateStair(
-                PivotLocation.FirstCorner,   // Pivot at bottom-front corner
+                PivotLocation.FirstVertex,   // Pivot at first vertex (bottom corner)
                 stairSize,                    // Size of entire staircase
                 stepCount,                    // Number of steps
                 true                         // Build sides
