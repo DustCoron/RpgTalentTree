@@ -54,6 +54,12 @@ namespace RpgTalentTree.Core.Dungeon
         [Tooltip("Add ceiling decorations")]
         [SerializeField] private bool addCeilingDecorations = false;
 
+        [Header("Marker System")]
+        [Tooltip("Visualize marker positions in Scene view (for debugging)")]
+        [SerializeField] private bool showMarkers = false;
+        [Tooltip("Size of marker gizmos in Scene view")]
+        [SerializeField] private float markerGizmoSize = 0.3f;
+
         private List<DungeonRoom> rooms = new List<DungeonRoom>();
         private GameObject dungeonParent;
         private System.Random random;
@@ -82,6 +88,7 @@ namespace RpgTalentTree.Core.Dungeon
 
         private List<CorridorSegment> corridorSegments = new List<CorridorSegment>();
         private List<Vector3> crossroadPositions = new List<Vector3>();
+        private List<DungeonMarker> dungeonMarkers = new List<DungeonMarker>();
 
         private void Start()
         {
@@ -101,9 +108,10 @@ namespace RpgTalentTree.Core.Dungeon
             GenerateRooms();
             GenerateCorridorsAndDoorways();
             CreateRoomMeshes();
+            GenerateMarkers();
             AddDecorations();
             OptimizeMeshes();
-            Debug.Log($"Dungeon generated with {rooms.Count} rooms");
+            Debug.Log($"Dungeon generated with {rooms.Count} rooms, {dungeonMarkers.Count} markers");
         }
 
         /// <summary>
@@ -122,6 +130,7 @@ namespace RpgTalentTree.Core.Dungeon
             rooms.Clear();
             corridorSegments.Clear();
             crossroadPositions.Clear();
+            dungeonMarkers.Clear();
         }
 
         private void InitializeGenerator()
@@ -572,6 +581,133 @@ namespace RpgTalentTree.Core.Dungeon
         }
 
         /// <summary>
+        /// Generate markers throughout the dungeon for decoration placement
+        /// </summary>
+        private void GenerateMarkers()
+        {
+            dungeonMarkers.Clear();
+
+            foreach (var room in rooms)
+            {
+                // Room floor center marker
+                Vector3 floorCenter = new Vector3(
+                    room.Position.x + room.Size.x / 2f,
+                    room.FloorHeight,
+                    room.Position.z + room.Size.z / 2f
+                );
+                dungeonMarkers.Add(DungeonMarker.CreateSimple(MarkerType.RoomFloorCenter, floorCenter, room));
+
+                // Room ceiling center marker
+                Vector3 ceilingCenter = floorCenter + Vector3.up * wallHeight;
+                dungeonMarkers.Add(DungeonMarker.CreateSimple(MarkerType.RoomCeilingCenter, ceilingCenter, room));
+
+                // Room corner markers
+                Vector3[] corners = new Vector3[]
+                {
+                    new Vector3(room.Position.x, room.FloorHeight, room.Position.z),
+                    new Vector3(room.Position.x + room.Size.x, room.FloorHeight, room.Position.z),
+                    new Vector3(room.Position.x + room.Size.x, room.FloorHeight, room.Position.z + room.Size.z),
+                    new Vector3(room.Position.x, room.FloorHeight, room.Position.z + room.Size.z)
+                };
+
+                foreach (var corner in corners)
+                {
+                    dungeonMarkers.Add(DungeonMarker.CreateSimple(MarkerType.RoomCorner, corner, room));
+                }
+
+                // Doorway markers
+                foreach (var doorway in room.Doorways)
+                {
+                    Vector3 doorwayPos = doorway.Position;
+                    Vector3 doorwayNormal = GetDoorwayNormal(doorway.Wall);
+
+                    // Left and right doorway markers
+                    Vector3 perpendicular = Vector3.Cross(doorwayNormal, Vector3.up);
+                    Vector3 leftPos = doorwayPos - perpendicular * (doorway.Width / 2f);
+                    Vector3 rightPos = doorwayPos + perpendicular * (doorway.Width / 2f);
+
+                    dungeonMarkers.Add(DungeonMarker.CreateWithNormal(MarkerType.DoorwayLeft, leftPos, doorwayNormal, room));
+                    dungeonMarkers.Add(DungeonMarker.CreateWithNormal(MarkerType.DoorwayRight, rightPos, doorwayNormal, room));
+
+                    // Doorway top marker (above doorway)
+                    Vector3 topPos = doorwayPos + Vector3.up * wallHeight * 0.7f;
+                    dungeonMarkers.Add(DungeonMarker.CreateWithNormal(MarkerType.DoorwayTop, topPos, doorwayNormal, room));
+                }
+
+                // Room wall mid-point markers (along walls between doorways)
+                EmitWallMarkers(room);
+            }
+
+            // Corridor intersection markers
+            foreach (var crossroadPos in crossroadPositions)
+            {
+                dungeonMarkers.Add(DungeonMarker.CreateSimple(MarkerType.CorridorIntersection, crossroadPos));
+            }
+
+            // Corridor floor markers (along corridor segments)
+            foreach (var segment in corridorSegments)
+            {
+                Vector3 midPoint = (segment.Start + segment.End) / 2f;
+                dungeonMarkers.Add(DungeonMarker.CreateSimple(MarkerType.CorridorFloor, midPoint));
+            }
+
+            Debug.Log($"Generated {dungeonMarkers.Count} markers for decoration");
+        }
+
+        /// <summary>
+        /// Get normal direction for a doorway wall side
+        /// </summary>
+        private Vector3 GetDoorwayNormal(Doorway.WallSide wallSide)
+        {
+            switch (wallSide)
+            {
+                case Doorway.WallSide.North: return Vector3.forward;
+                case Doorway.WallSide.South: return Vector3.back;
+                case Doorway.WallSide.East: return Vector3.right;
+                case Doorway.WallSide.West: return Vector3.left;
+                default: return Vector3.forward;
+            }
+        }
+
+        /// <summary>
+        /// Emit markers along room walls
+        /// </summary>
+        private void EmitWallMarkers(DungeonRoom room)
+        {
+            // North wall
+            Vector3 northMid = new Vector3(
+                room.Position.x + room.Size.x / 2f,
+                room.FloorHeight + wallHeight / 2f,
+                room.Position.z + room.Size.z
+            );
+            dungeonMarkers.Add(DungeonMarker.CreateWithNormal(MarkerType.RoomWallMid, northMid, Vector3.back, room));
+
+            // South wall
+            Vector3 southMid = new Vector3(
+                room.Position.x + room.Size.x / 2f,
+                room.FloorHeight + wallHeight / 2f,
+                room.Position.z
+            );
+            dungeonMarkers.Add(DungeonMarker.CreateWithNormal(MarkerType.RoomWallMid, southMid, Vector3.forward, room));
+
+            // East wall
+            Vector3 eastMid = new Vector3(
+                room.Position.x + room.Size.x,
+                room.FloorHeight + wallHeight / 2f,
+                room.Position.z + room.Size.z / 2f
+            );
+            dungeonMarkers.Add(DungeonMarker.CreateWithNormal(MarkerType.RoomWallMid, eastMid, Vector3.left, room));
+
+            // West wall
+            Vector3 westMid = new Vector3(
+                room.Position.x,
+                room.FloorHeight + wallHeight / 2f,
+                room.Position.z + room.Size.z / 2f
+            );
+            dungeonMarkers.Add(DungeonMarker.CreateWithNormal(MarkerType.RoomWallMid, westMid, Vector3.right, room));
+        }
+
+        /// <summary>
         /// Add decorative elements to the dungeon
         /// </summary>
         private void AddDecorations()
@@ -799,6 +935,83 @@ namespace RpgTalentTree.Core.Dungeon
             heightVariationChance = Mathf.Clamp01(heightVariationChance);
             stepHeight = Mathf.Clamp(stepHeight, 0.1f, 0.5f);
             stepDepth = Mathf.Clamp(stepDepth, 0.3f, 1f);
+            markerGizmoSize = Mathf.Max(0.1f, markerGizmoSize);
+        }
+
+        /// <summary>
+        /// Public accessor for dungeon markers (for external theme systems)
+        /// </summary>
+        public List<DungeonMarker> GetMarkers()
+        {
+            return new List<DungeonMarker>(dungeonMarkers);
+        }
+
+        /// <summary>
+        /// Draw marker gizmos in Scene view for debugging
+        /// </summary>
+        private void OnDrawGizmos()
+        {
+            if (!showMarkers || dungeonMarkers == null || dungeonMarkers.Count == 0)
+                return;
+
+            foreach (var marker in dungeonMarkers)
+            {
+                // Color code markers by type
+                Gizmos.color = GetMarkerColor(marker.Type);
+
+                // Draw sphere at marker position
+                Gizmos.DrawWireSphere(marker.Position, markerGizmoSize);
+
+                // Draw direction arrow for markers with rotation
+                if (marker.Type == MarkerType.DoorwayLeft ||
+                    marker.Type == MarkerType.DoorwayRight ||
+                    marker.Type == MarkerType.RoomWallMid)
+                {
+                    Vector3 forward = marker.Rotation * Vector3.forward;
+                    Gizmos.DrawRay(marker.Position, forward * markerGizmoSize * 2f);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Get color for marker type visualization
+        /// </summary>
+        private Color GetMarkerColor(MarkerType type)
+        {
+            switch (type)
+            {
+                case MarkerType.DoorwayLeft:
+                case MarkerType.DoorwayRight:
+                case MarkerType.DoorwayTop:
+                    return Color.yellow;
+
+                case MarkerType.RoomFloorCenter:
+                    return Color.green;
+
+                case MarkerType.RoomCeilingCenter:
+                    return Color.cyan;
+
+                case MarkerType.RoomCorner:
+                    return Color.magenta;
+
+                case MarkerType.RoomWallMid:
+                    return Color.blue;
+
+                case MarkerType.CorridorFloor:
+                case MarkerType.CorridorIntersection:
+                    return Color.red;
+
+                case MarkerType.StairBottom:
+                case MarkerType.StairTop:
+                case MarkerType.StairMid:
+                    return new Color(1f, 0.5f, 0f); // Orange
+
+                case MarkerType.LightPoint:
+                    return Color.white;
+
+                default:
+                    return Color.gray;
+            }
         }
     }
 }
