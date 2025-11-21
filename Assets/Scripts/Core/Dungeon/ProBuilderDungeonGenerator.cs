@@ -59,6 +59,27 @@ namespace RpgTalentTree.Core.Dungeon
         private CorridorGenerator corridorGenerator;
         private BSPNode bspRoot;
 
+        // Track corridor segments for crossroad detection
+        private struct CorridorSegment
+        {
+            public Vector3 Start;
+            public Vector3 End;
+            public bool IsHorizontalX; // true if corridor runs along X axis
+            public bool IsHorizontalZ; // true if corridor runs along Z axis
+
+            public CorridorSegment(Vector3 start, Vector3 end)
+            {
+                Start = start;
+                End = end;
+                Vector3 dir = end - start;
+                IsHorizontalX = Mathf.Abs(dir.x) > Mathf.Abs(dir.z);
+                IsHorizontalZ = Mathf.Abs(dir.z) > Mathf.Abs(dir.x);
+            }
+        }
+
+        private List<CorridorSegment> corridorSegments = new List<CorridorSegment>();
+        private List<Vector3> crossroadPositions = new List<Vector3>();
+
         private void Start()
         {
             if (generateOnStart)
@@ -96,6 +117,8 @@ namespace RpgTalentTree.Core.Dungeon
             }
 
             rooms.Clear();
+            corridorSegments.Clear();
+            crossroadPositions.Clear();
         }
 
         private void InitializeGenerator()
@@ -382,11 +405,148 @@ namespace RpgTalentTree.Core.Dungeon
         }
 
         /// <summary>
-        /// Create a corridor segment between two points using CorridorGenerator
+        /// Create a corridor segment between two points, detecting and creating crossroads if needed
         /// </summary>
         private void CreateCorridor(Vector3 start, Vector3 end, int corridorIndex, string direction)
         {
-            corridorGenerator.CreateCorridor(start, end, dungeonParent.transform, corridorIndex, direction);
+            // Check for intersections with existing corridors
+            Vector3? intersectionPoint = FindCorridorIntersection(start, end);
+
+            if (intersectionPoint.HasValue)
+            {
+                Vector3 crossroad = intersectionPoint.Value;
+
+                // Check if we already have a crossroad at this position
+                bool crossroadExists = false;
+                foreach (var existingCrossroad in crossroadPositions)
+                {
+                    if (Vector3.Distance(existingCrossroad, crossroad) < corridorWidth * 0.5f)
+                    {
+                        crossroadExists = true;
+                        crossroad = existingCrossroad; // Use existing position
+                        break;
+                    }
+                }
+
+                // Create corridor segments from start to crossroad and crossroad to end
+                if (Vector3.Distance(start, crossroad) > 0.5f)
+                {
+                    corridorGenerator.CreateCorridor(start, crossroad, dungeonParent.transform, corridorIndex, direction + "_ToCrossroad");
+                    corridorSegments.Add(new CorridorSegment(start, crossroad));
+                }
+
+                if (Vector3.Distance(crossroad, end) > 0.5f)
+                {
+                    corridorGenerator.CreateCorridor(crossroad, end, dungeonParent.transform, corridorIndex, direction + "_FromCrossroad");
+                    corridorSegments.Add(new CorridorSegment(crossroad, end));
+                }
+
+                // Create crossroad piece if it doesn't exist yet
+                if (!crossroadExists)
+                {
+                    CreateCrossroad(crossroad, corridorIndex);
+                    crossroadPositions.Add(crossroad);
+                }
+            }
+            else
+            {
+                // No intersection, create normal corridor
+                corridorGenerator.CreateCorridor(start, end, dungeonParent.transform, corridorIndex, direction);
+                corridorSegments.Add(new CorridorSegment(start, end));
+            }
+        }
+
+        /// <summary>
+        /// Find intersection point between a new corridor and existing corridors
+        /// </summary>
+        private Vector3? FindCorridorIntersection(Vector3 start, Vector3 end)
+        {
+            CorridorSegment newSegment = new CorridorSegment(start, end);
+            float halfWidth = corridorWidth / 2f;
+
+            foreach (var existing in corridorSegments)
+            {
+                // Check if corridors are perpendicular (one horizontal X, one horizontal Z)
+                if (newSegment.IsHorizontalX && existing.IsHorizontalZ)
+                {
+                    // New corridor runs along X, existing runs along Z
+                    float intersectX = existing.Start.x;
+                    float intersectZ = newSegment.Start.z;
+                    float intersectY = Mathf.Max(newSegment.Start.y, existing.Start.y); // Use higher Y
+
+                    // Check if intersection point is within both corridor bounds
+                    if (IsPointOnSegment(new Vector3(intersectX, intersectY, intersectZ), newSegment, halfWidth) &&
+                        IsPointOnSegment(new Vector3(intersectX, intersectY, intersectZ), existing, halfWidth))
+                    {
+                        return new Vector3(intersectX, intersectY, intersectZ);
+                    }
+                }
+                else if (newSegment.IsHorizontalZ && existing.IsHorizontalX)
+                {
+                    // New corridor runs along Z, existing runs along X
+                    float intersectX = newSegment.Start.x;
+                    float intersectZ = existing.Start.z;
+                    float intersectY = Mathf.Max(newSegment.Start.y, existing.Start.y);
+
+                    if (IsPointOnSegment(new Vector3(intersectX, intersectY, intersectZ), newSegment, halfWidth) &&
+                        IsPointOnSegment(new Vector3(intersectX, intersectY, intersectZ), existing, halfWidth))
+                    {
+                        return new Vector3(intersectX, intersectY, intersectZ);
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Check if a point lies on a corridor segment (with tolerance)
+        /// </summary>
+        private bool IsPointOnSegment(Vector3 point, CorridorSegment segment, float tolerance)
+        {
+            Vector3 min = Vector3.Min(segment.Start, segment.End);
+            Vector3 max = Vector3.Max(segment.Start, segment.End);
+
+            return point.x >= min.x - tolerance && point.x <= max.x + tolerance &&
+                   point.z >= min.z - tolerance && point.z <= max.z + tolerance &&
+                   Mathf.Abs(point.y - segment.Start.y) < 0.1f; // Same floor level
+        }
+
+        /// <summary>
+        /// Create a crossroad piece where corridors intersect
+        /// </summary>
+        private void CreateCrossroad(Vector3 position, int corridorIndex)
+        {
+            // Create a larger square piece for the crossroad
+            GameObject crossroadObj = new GameObject($"Crossroad_{corridorIndex}");
+            crossroadObj.transform.SetParent(dungeonParent.transform);
+            crossroadObj.transform.position = position;
+
+            float crossroadSize = corridorWidth * 1.5f; // Make crossroad slightly larger
+            float halfSize = crossroadSize / 2f;
+
+            // Create floor for crossroad using ProBuilder cube
+            ProBuilderMesh floorMesh = ShapeGenerator.GenerateCube(
+                PivotLocation.Center,
+                new Vector3(crossroadSize, 0.1f, crossroadSize)
+            );
+
+            GameObject floorObj = floorMesh.gameObject;
+            floorObj.name = "CrossroadFloor";
+            floorObj.transform.SetParent(crossroadObj.transform);
+            floorObj.transform.localPosition = new Vector3(0, 0.05f, 0);
+
+            // Apply material
+            var renderer = floorMesh.GetComponent<MeshRenderer>();
+            if (renderer != null && corridorMaterial != null)
+            {
+                renderer.sharedMaterial = corridorMaterial;
+            }
+
+            floorMesh.ToMesh();
+            floorMesh.Refresh();
+
+            Debug.Log($"Created crossroad at {position}");
         }
 
         /// <summary>
