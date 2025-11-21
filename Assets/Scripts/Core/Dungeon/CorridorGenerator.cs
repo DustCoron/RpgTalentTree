@@ -109,14 +109,14 @@ namespace RpgTalentTree.Core.Dungeon
             if (Vector3.Distance(startPos, endPos) < 0.1f)
                 return null;
 
-            // Calculate waypoints with room avoidance
-            List<Vector3> waypoints = CalculateCorridorWaypoints(startPos, startDir, endPos, endDir);
+            // Calculate simple L-shape waypoints
+            List<Vector3> waypoints = CalculateSimpleLPath(startPos, startDir, endPos, endDir);
 
-            // Generate path points with consistent density
-            List<Vector3> pathPoints = GenerateMultiCornerPath(waypoints, segmentsPerUnit);
+            // Validate waypoints don't go through rooms
+            waypoints = ValidateWaypointsAgainstRooms(waypoints);
 
-            // Validate path doesn't go through rooms
-            pathPoints = ValidatePathAgainstRooms(pathPoints);
+            // Generate path with minimal segments (just enough for smooth corners)
+            List<Vector3> pathPoints = GenerateCleanPath(waypoints);
 
             // Check for intersections
             List<Vector3> intersections = FindIntersections(pathPoints);
@@ -132,36 +132,39 @@ namespace RpgTalentTree.Core.Dungeon
             corridorObj.transform.SetParent(parent);
             corridorObj.transform.position = Vector3.zero;
 
-            CreateSplineCorridorMesh(corridorObj, pathPoints);
+            CreateCleanCorridorMesh(corridorObj, pathPoints);
             corridorPaths.Add(new CorridorPath(pathPoints, corridorIndex, corridorObj));
 
             return corridorObj;
         }
 
         /// <summary>
-        /// Calculate waypoints including dog-leg corners for long segments
+        /// Calculate simple L-shaped path with optional dog-leg for long segments
         /// </summary>
-        private List<Vector3> CalculateCorridorWaypoints(Vector3 start, Vector3 startDir, Vector3 end, Vector3 endDir)
+        private List<Vector3> CalculateSimpleLPath(Vector3 start, Vector3 startDir, Vector3 end, Vector3 endDir)
         {
             List<Vector3> waypoints = new List<Vector3> { start };
 
-            // Calculate initial corner for L-shape
             Vector3 corner = CalculateCornerPoint(start, startDir, end, endDir);
+            float totalDist = Vector3.Distance(start, corner) + Vector3.Distance(corner, end);
 
-            // Process first segment (start to corner)
-            float dist1 = Vector3.Distance(start, corner);
-            if (dist1 > maxSegmentLength)
+            // Only add dog-leg if corridor is very long
+            if (totalDist > maxSegmentLength * 2)
             {
-                AddDogLegWaypoints(waypoints, start, corner);
+                // Add single dog-leg in the middle
+                Vector3 mid = (start + end) / 2f;
+                Vector3 dir = (end - start).normalized;
+                Vector3 perp = Vector3.Cross(dir, Vector3.up).normalized;
+
+                Vector3 dogLeg1 = mid + perp * corridorWidth * 3;
+                Vector3 dogLeg2 = mid + perp * corridorWidth * 3 + dir * corridorWidth * 2;
+
+                waypoints.Add(dogLeg1);
+                waypoints.Add(dogLeg2);
             }
-
-            waypoints.Add(corner);
-
-            // Process second segment (corner to end)
-            float dist2 = Vector3.Distance(corner, end);
-            if (dist2 > maxSegmentLength)
+            else
             {
-                AddDogLegWaypoints(waypoints, corner, end);
+                waypoints.Add(corner);
             }
 
             waypoints.Add(end);
@@ -169,44 +172,62 @@ namespace RpgTalentTree.Core.Dungeon
         }
 
         /// <summary>
-        /// Add dog-leg (jog) waypoints in the middle of a long segment
-        /// Creates pattern: start -> corner1 -> corner2 -> continues toward end
+        /// Validate waypoints don't pass through rooms
         /// </summary>
-        private void AddDogLegWaypoints(List<Vector3> waypoints, Vector3 segStart, Vector3 segEnd)
+        private List<Vector3> ValidateWaypointsAgainstRooms(List<Vector3> waypoints)
         {
-            Vector3 dir = (segEnd - segStart).normalized;
-            float totalDist = Vector3.Distance(segStart, segEnd);
+            List<Vector3> valid = new List<Vector3>();
 
-            // Calculate number of dog-legs needed
-            int dogLegs = Mathf.FloorToInt(totalDist / maxSegmentLength);
-
-            for (int d = 0; d < dogLegs; d++)
+            for (int i = 0; i < waypoints.Count; i++)
             {
-                // Place dog-leg in the middle of each max-length section
-                float startT = (d * maxSegmentLength + maxSegmentLength * 0.4f) / totalDist;
-                float endT = (d * maxSegmentLength + maxSegmentLength * 0.6f) / totalDist;
+                Vector3 point = waypoints[i];
 
-                Vector3 dogLegStart = Vector3.Lerp(segStart, segEnd, startT);
-                Vector3 dogLegEnd = Vector3.Lerp(segStart, segEnd, endT);
+                // Don't modify start/end points
+                if (i == 0 || i == waypoints.Count - 1)
+                {
+                    valid.Add(point);
+                    continue;
+                }
 
-                // Offset perpendicular - alternate sides
-                Vector3 perp = Vector3.Cross(dir, Vector3.up).normalized;
-                float offsetAmount = corridorWidth * 2f * ((d % 2 == 0) ? 1 : -1);
-
-                // First corner - go perpendicular
-                Vector3 corner1 = dogLegStart + perp * offsetAmount;
-                // Second corner - come back to line
-                Vector3 corner2 = dogLegEnd + perp * offsetAmount;
-
-                waypoints.Add(corner1);
-                waypoints.Add(corner2);
+                // Push middle points out of rooms
+                if (IsInsideAnyRoom(point))
+                {
+                    Vector3 pushed = PushPointOutOfRooms(point);
+                    valid.Add(pushed);
+                }
+                else
+                {
+                    valid.Add(point);
+                }
             }
+
+            return valid;
         }
 
         /// <summary>
-        /// Generate path points along multiple waypoints
+        /// Push a point outside of all rooms
         /// </summary>
-        private List<Vector3> GenerateMultiCornerPath(List<Vector3> waypoints, int segmentsPerUnit)
+        private Vector3 PushPointOutOfRooms(Vector3 point)
+        {
+            Vector3[] directions = { Vector3.right, Vector3.left, Vector3.forward, Vector3.back };
+
+            foreach (var dir in directions)
+            {
+                for (float dist = corridorWidth; dist <= corridorWidth * 5; dist += corridorWidth)
+                {
+                    Vector3 test = point + dir * dist;
+                    if (!IsInsideAnyRoom(test))
+                        return test;
+                }
+            }
+
+            return point; // Couldn't push out, return original
+        }
+
+        /// <summary>
+        /// Generate clean path with minimal segments
+        /// </summary>
+        private List<Vector3> GenerateCleanPath(List<Vector3> waypoints)
         {
             List<Vector3> points = new List<Vector3>();
 
@@ -215,9 +236,11 @@ namespace RpgTalentTree.Core.Dungeon
                 Vector3 segStart = waypoints[w];
                 Vector3 segEnd = waypoints[w + 1];
                 float dist = Vector3.Distance(segStart, segEnd);
-                int segments = Mathf.Max(2, Mathf.RoundToInt(dist * segmentsPerUnit));
 
-                int startIdx = (w == 0) ? 0 : 1; // Skip first point for subsequent segments
+                // Use fewer segments - just 1 per unit of distance, minimum 2
+                int segments = Mathf.Max(2, Mathf.CeilToInt(dist / 2f));
+
+                int startIdx = (w == 0) ? 0 : 1;
                 for (int i = startIdx; i <= segments; i++)
                 {
                     float t = i / (float)segments;
@@ -229,38 +252,103 @@ namespace RpgTalentTree.Core.Dungeon
         }
 
         /// <summary>
-        /// Adjust path points that intersect with rooms
+        /// Create clean corridor mesh with proper geometry
         /// </summary>
-        private List<Vector3> ValidatePathAgainstRooms(List<Vector3> pathPoints)
+        private void CreateCleanCorridorMesh(GameObject parent, List<Vector3> pathPoints)
         {
-            List<Vector3> validPath = new List<Vector3>();
+            if (pathPoints.Count < 2) return;
+
+            float halfWidth = corridorWidth / 2f;
+            List<Vector3> vertices = new List<Vector3>();
+            List<Face> faces = new List<Face>();
+
+            // Calculate perpendicular vectors for each point
+            List<Vector3> leftPoints = new List<Vector3>();
+            List<Vector3> rightPoints = new List<Vector3>();
 
             for (int i = 0; i < pathPoints.Count; i++)
             {
-                Vector3 point = pathPoints[i];
+                Vector3 pos = pathPoints[i];
+                Vector3 forward;
 
-                // If point is inside a room, try to push it out
-                if (IsInsideAnyRoom(point) && i > 0 && i < pathPoints.Count - 1)
+                // Calculate forward direction
+                if (i == 0)
+                    forward = (pathPoints[1] - pathPoints[0]).normalized;
+                else if (i == pathPoints.Count - 1)
+                    forward = (pathPoints[i] - pathPoints[i - 1]).normalized;
+                else
                 {
-                    // Try to offset perpendicular to path direction
-                    Vector3 dir = (pathPoints[Mathf.Min(i + 1, pathPoints.Count - 1)] - pathPoints[Mathf.Max(i - 1, 0)]).normalized;
-                    Vector3 perp = Vector3.Cross(dir, Vector3.up).normalized;
-
-                    // Try both directions
-                    Vector3 offset1 = point + perp * corridorWidth * 2;
-                    Vector3 offset2 = point - perp * corridorWidth * 2;
-
-                    if (!IsInsideAnyRoom(offset1))
-                        point = offset1;
-                    else if (!IsInsideAnyRoom(offset2))
-                        point = offset2;
-                    // If both fail, keep original (will overlap but at least connects)
+                    // Average direction at corners for smoother transition
+                    Vector3 prev = (pathPoints[i] - pathPoints[i - 1]).normalized;
+                    Vector3 next = (pathPoints[i + 1] - pathPoints[i]).normalized;
+                    forward = ((prev + next) / 2f).normalized;
                 }
 
-                validPath.Add(point);
+                Vector3 right = Vector3.Cross(Vector3.up, forward).normalized * halfWidth;
+
+                leftPoints.Add(pos - right);
+                rightPoints.Add(pos + right);
             }
 
-            return validPath;
+            // Build floor
+            int vertOffset = 0;
+            for (int i = 0; i < pathPoints.Count - 1; i++)
+            {
+                vertices.Add(leftPoints[i]);
+                vertices.Add(rightPoints[i]);
+                vertices.Add(rightPoints[i + 1]);
+                vertices.Add(leftPoints[i + 1]);
+                faces.Add(new Face(new int[] { vertOffset, vertOffset + 3, vertOffset + 2, vertOffset, vertOffset + 2, vertOffset + 1 }));
+                vertOffset += 4;
+            }
+
+            // Build ceiling
+            for (int i = 0; i < pathPoints.Count - 1; i++)
+            {
+                Vector3 h = Vector3.up * wallHeight;
+                vertices.Add(leftPoints[i] + h);
+                vertices.Add(rightPoints[i] + h);
+                vertices.Add(rightPoints[i + 1] + h);
+                vertices.Add(leftPoints[i + 1] + h);
+                faces.Add(new Face(new int[] { vertOffset, vertOffset + 1, vertOffset + 2, vertOffset, vertOffset + 2, vertOffset + 3 }));
+                vertOffset += 4;
+            }
+
+            // Build left wall
+            for (int i = 0; i < pathPoints.Count - 1; i++)
+            {
+                Vector3 h = Vector3.up * wallHeight;
+                vertices.Add(leftPoints[i]);
+                vertices.Add(leftPoints[i + 1]);
+                vertices.Add(leftPoints[i + 1] + h);
+                vertices.Add(leftPoints[i] + h);
+                faces.Add(new Face(new int[] { vertOffset, vertOffset + 1, vertOffset + 2, vertOffset, vertOffset + 2, vertOffset + 3 }));
+                vertOffset += 4;
+            }
+
+            // Build right wall
+            for (int i = 0; i < pathPoints.Count - 1; i++)
+            {
+                Vector3 h = Vector3.up * wallHeight;
+                vertices.Add(rightPoints[i]);
+                vertices.Add(rightPoints[i + 1]);
+                vertices.Add(rightPoints[i + 1] + h);
+                vertices.Add(rightPoints[i] + h);
+                faces.Add(new Face(new int[] { vertOffset, vertOffset + 3, vertOffset + 2, vertOffset, vertOffset + 2, vertOffset + 1 }));
+                vertOffset += 4;
+            }
+
+            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices.ToArray(), faces.ToArray());
+            pbMesh.gameObject.transform.SetParent(parent.transform);
+            pbMesh.gameObject.transform.localPosition = Vector3.zero;
+            pbMesh.gameObject.name = "CorridorMesh";
+
+            var renderer = pbMesh.GetComponent<MeshRenderer>();
+            if (renderer != null)
+                renderer.sharedMaterial = floorMaterial;
+
+            pbMesh.ToMesh();
+            pbMesh.Refresh();
         }
 
         /// <summary>
