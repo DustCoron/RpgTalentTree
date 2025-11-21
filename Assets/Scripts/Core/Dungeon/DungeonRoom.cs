@@ -23,23 +23,57 @@ namespace RpgTalentTree.Core.Dungeon
     }
 
     /// <summary>
+    /// Room type for gameplay logic (CodeRespawn pattern)
+    /// </summary>
+    public enum RoomType
+    {
+        Normal,
+        Spawn,
+        Boss,
+        Treasure,
+        Secret
+    }
+
+    /// <summary>
     /// Represents a single room in the dungeon
+    /// Enhanced with CodeRespawn patterns: unique ID, connectivity, room types
     /// </summary>
     public class DungeonRoom
     {
+        private static int nextId = 0;
+
+        public int Id { get; private set; }
         public Vector3Int Position { get; set; }
         public Vector3Int Size { get; set; }
         public GameObject RoomObject { get; set; }
         public List<Doorway> Doorways { get; set; }
         public float FloorHeight { get; set; }
 
+        // Room connectivity (CodeRespawn pattern)
+        public List<int> ConnectedRoomIds { get; private set; } = new List<int>();
+        public RoomType Type { get; set; } = RoomType.Normal;
+
+        // Metadata for custom data
+        public Dictionary<string, object> Metadata { get; private set; } = new Dictionary<string, object>();
+
         public DungeonRoom(Vector3Int position, Vector3Int size, float floorHeight = 0f)
         {
+            Id = nextId++;
             Position = position;
             Size = size;
             FloorHeight = floorHeight;
             Doorways = new List<Doorway>();
         }
+
+        public void ConnectTo(DungeonRoom other)
+        {
+            if (!ConnectedRoomIds.Contains(other.Id))
+                ConnectedRoomIds.Add(other.Id);
+            if (!other.ConnectedRoomIds.Contains(Id))
+                other.ConnectedRoomIds.Add(Id);
+        }
+
+        public static void ResetIdCounter() => nextId = 0;
 
         /// <summary>
         /// Get the center position of the room in world space (at floor level)
