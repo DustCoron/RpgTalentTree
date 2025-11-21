@@ -107,8 +107,8 @@ namespace RpgTalentTree.Core.Dungeon
         private void CreateDoorwayColumns(GameObject parent, Doorway.WallSide wallSide, Vector3 corner1, Vector3 corner2, float doorwayStart, float doorwayEnd, Doorway doorway)
         {
             bool isHorizontal = wallSide == Doorway.WallSide.North || wallSide == Doorway.WallSide.South;
-            float columnWidth = 0.3f;
-            float columnDepth = 0.3f;
+            float columnWidth = 0.5f;  // Increased from 0.3f for more visible columns
+            float columnDepth = 0.5f;  // Increased from 0.3f for more visible columns
             float columnHeight = wallHeight; // Columns same height as walls
 
             // Calculate column positions - positioned exactly at doorway edges (wall ends)
@@ -238,18 +238,18 @@ namespace RpgTalentTree.Core.Dungeon
             GameObject archObject = archMesh.gameObject;
             archObject.name = $"Arch_{wallSide}";
             archObject.transform.SetParent(parent.transform);
-            archObject.transform.position = centerPos;
+            archObject.transform.localPosition = centerPos;  // Use localPosition since parented to room
 
             // Rotate arch to align with wall orientation
             if (isHorizontal)
             {
-                // For North/South walls, arch faces along Z axis
-                archObject.transform.rotation = Quaternion.Euler(0, 0, 0);
+                // For North/South walls, arch opening faces along Z axis
+                archObject.transform.localRotation = Quaternion.Euler(0, 0, 0);
             }
             else
             {
-                // For East/West walls, arch faces along X axis, rotate 90 degrees
-                archObject.transform.rotation = Quaternion.Euler(0, 90, 0);
+                // For East/West walls, arch opening faces along X axis, rotate 90 degrees
+                archObject.transform.localRotation = Quaternion.Euler(0, 90, 0);
             }
 
             // Apply material
