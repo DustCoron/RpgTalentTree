@@ -22,8 +22,9 @@ namespace RpgTalentTree.Core.Dungeon
     }
 
     /// <summary>
-    /// Handles generation of corridors with walls and ceilings using ProBuilder API
-    /// Supports both straight and spline-based curved corridors
+    /// Generates corridors using ProBuilder cubes for clean, reliable geometry.
+    /// Each corridor segment is composed of individual floor, wall, and ceiling cubes.
+    /// Supports L-shaped hard-corner corridors and Bezier spline corridors.
     /// </summary>
     public class CorridorGenerator
     {
@@ -34,17 +35,17 @@ namespace RpgTalentTree.Core.Dungeon
         private float wallThickness;
         private int corridorWidth;
 
-        // Track all corridor paths for intersection detection
         private List<CorridorPath> corridorPaths = new List<CorridorPath>();
         private List<Vector3> junctionPoints = new List<Vector3>();
-
-        // Room bounds for collision avoidance
         private List<Bounds> roomBounds = new List<Bounds>();
         private float maxSegmentLength = 15f;
+        private DungeonGrid grid;
 
         public void SetMaxSegmentLength(float length) => maxSegmentLength = length;
+        public void SetGrid(DungeonGrid dungeonGrid) => grid = dungeonGrid;
 
-        public CorridorGenerator(Material floorMaterial, Material wallMaterial, Material ceilingMaterial, float wallHeight, float wallThickness, int corridorWidth)
+        public CorridorGenerator(Material floorMaterial, Material wallMaterial, Material ceilingMaterial,
+            float wallHeight, float wallThickness, int corridorWidth)
         {
             this.floorMaterial = floorMaterial;
             this.wallMaterial = wallMaterial;
@@ -59,140 +60,47 @@ namespace RpgTalentTree.Core.Dungeon
             corridorPaths.Clear();
             junctionPoints.Clear();
             roomBounds.Clear();
+            grid = null;
         }
 
         public List<Vector3> GetJunctionPoints() => junctionPoints;
+        public List<CorridorPath> GetCorridorPaths() => corridorPaths;
 
-        /// <summary>
-        /// Register room bounds for collision avoidance
-        /// </summary>
         public void RegisterRoomBounds(Bounds bounds)
         {
-            // Expand bounds slightly for corridor clearance
             bounds.Expand(corridorWidth * 0.5f);
             roomBounds.Add(bounds);
         }
 
-        /// <summary>
-        /// Check if a point is inside any room
-        /// </summary>
+        // ===================== Room Avoidance =====================
+
         private bool IsInsideAnyRoom(Vector3 point)
         {
             foreach (var bounds in roomBounds)
             {
-                if (bounds.Contains(point))
-                    return true;
+                if (bounds.Contains(point)) return true;
             }
             return false;
         }
 
-        /// <summary>
-        /// Check if a line segment intersects any room
-        /// </summary>
         private bool SegmentIntersectsRoom(Vector3 start, Vector3 end)
         {
             int steps = Mathf.CeilToInt(Vector3.Distance(start, end) / (corridorWidth * 0.5f));
             for (int i = 1; i < steps; i++)
             {
                 Vector3 point = Vector3.Lerp(start, end, i / (float)steps);
-                if (IsInsideAnyRoom(point))
-                    return true;
+                if (IsInsideAnyRoom(point)) return true;
             }
             return false;
         }
 
-        /// <summary>
-        /// Create an L-shaped corridor with strict room avoidance
-        /// </summary>
-        public GameObject CreateLShapedCorridor(Vector3 startPos, Vector3 startDir, Vector3 endPos, Vector3 endDir, Transform parent, int corridorIndex, int segmentsPerUnit = 2)
-        {
-            if (Vector3.Distance(startPos, endPos) < 0.1f)
-                return null;
-
-            // Calculate path that avoids all rooms (except at start/end doorways)
-            List<Vector3> waypoints = CalculateRoomAvoidingPath(startPos, startDir, endPos, endDir);
-
-            if (waypoints.Count < 2)
-                return null;
-
-            // Generate path with minimal segments
-            List<Vector3> pathPoints = GenerateCleanPath(waypoints);
-
-            // Final validation - remove any points inside rooms (except endpoints)
-            pathPoints = StrictRoomAvoidance(pathPoints);
-
-            // Check for intersections
-            List<Vector3> intersections = FindIntersections(pathPoints);
-            foreach (var intersection in intersections)
-            {
-                bool exists = junctionPoints.Exists(p => Vector3.Distance(p, intersection) < corridorWidth);
-                if (!exists)
-                    junctionPoints.Add(intersection);
-            }
-
-            // Create corridor mesh
-            GameObject corridorObj = new GameObject($"LCorridor_{corridorIndex}");
-            corridorObj.transform.SetParent(parent);
-            corridorObj.transform.position = Vector3.zero;
-
-            CreateCleanCorridorMesh(corridorObj, pathPoints);
-            corridorPaths.Add(new CorridorPath(pathPoints, corridorIndex, corridorObj));
-
-            return corridorObj;
-        }
-
-        /// <summary>
-        /// Calculate a path that strictly avoids all room interiors
-        /// </summary>
-        private List<Vector3> CalculateRoomAvoidingPath(Vector3 start, Vector3 startDir, Vector3 end, Vector3 endDir)
-        {
-            List<Vector3> waypoints = new List<Vector3>();
-
-            // Start point (at doorway - allowed to touch room)
-            waypoints.Add(start);
-
-            // Move out from doorway first (clearance point)
-            Vector3 startClearance = start + startDir * (corridorWidth + 1);
-            waypoints.Add(startClearance);
-
-            // End clearance point
-            Vector3 endClearance = end + endDir * (corridorWidth + 1);
-
-            // Calculate corner that avoids rooms
-            Vector3 corner = FindSafeCorner(startClearance, endClearance, startDir, endDir);
-
-            // Check if direct path is blocked
-            if (SegmentIntersectsRoom(startClearance, corner) || SegmentIntersectsRoom(corner, endClearance))
-            {
-                // Try to route around - find alternative corner
-                corner = FindAlternativeCorner(startClearance, endClearance, startDir, endDir);
-            }
-
-            // Only add corner if it's different from start/end clearance
-            if (Vector3.Distance(corner, startClearance) > 1f && Vector3.Distance(corner, endClearance) > 1f)
-            {
-                waypoints.Add(corner);
-            }
-
-            waypoints.Add(endClearance);
-            waypoints.Add(end);
-
-            return waypoints;
-        }
-
-        /// <summary>
-        /// Find a safe corner position that doesn't intersect rooms
-        /// </summary>
         private Vector3 FindSafeCorner(Vector3 start, Vector3 end, Vector3 startDir, Vector3 endDir)
         {
-            // Try standard L-shape corner first
             Vector3 corner = CalculateCornerPoint(start, startDir, end, endDir);
+            if (!IsInsideAnyRoom(corner)) return corner;
 
-            if (!IsInsideAnyRoom(corner))
-                return corner;
-
-            // Try alternative corners
-            Vector3[] alternatives = {
+            Vector3[] alternatives =
+            {
                 new Vector3(start.x, start.y, end.z),
                 new Vector3(end.x, start.y, start.z),
                 new Vector3((start.x + end.x) / 2f, start.y, start.z),
@@ -201,240 +109,81 @@ namespace RpgTalentTree.Core.Dungeon
 
             foreach (var alt in alternatives)
             {
-                if (!IsInsideAnyRoom(alt))
-                    return alt;
+                if (!IsInsideAnyRoom(alt)) return alt;
             }
-
-            return corner; // Return original if nothing better found
+            return corner;
         }
 
-        /// <summary>
-        /// Find alternative corner by routing around rooms
-        /// </summary>
         private Vector3 FindAlternativeCorner(Vector3 start, Vector3 end, Vector3 startDir, Vector3 endDir)
         {
-            // Try routing with offset to avoid rooms
             Vector3 dir = (end - start).normalized;
             Vector3 perp = Vector3.Cross(dir, Vector3.up).normalized;
 
-            // Try both sides with increasing offset
             for (float offset = corridorWidth * 2; offset <= corridorWidth * 10; offset += corridorWidth * 2)
             {
                 Vector3 midPoint = (start + end) / 2f;
 
-                // Try positive offset
                 Vector3 corner1 = midPoint + perp * offset;
                 if (!IsInsideAnyRoom(corner1) &&
                     !SegmentIntersectsRoom(start, corner1) &&
                     !SegmentIntersectsRoom(corner1, end))
-                {
                     return corner1;
-                }
 
-                // Try negative offset
                 Vector3 corner2 = midPoint - perp * offset;
                 if (!IsInsideAnyRoom(corner2) &&
                     !SegmentIntersectsRoom(start, corner2) &&
                     !SegmentIntersectsRoom(corner2, end))
-                {
                     return corner2;
-                }
             }
-
-            // Fallback to original calculation
             return CalculateCornerPoint(start, startDir, end, endDir);
         }
 
-        /// <summary>
-        /// Final pass to ensure no corridor points are inside rooms (except first/last)
-        /// </summary>
+        private Vector3 PushPointOutOfRooms(Vector3 point)
+        {
+            Vector3[] directions = { Vector3.right, Vector3.left, Vector3.forward, Vector3.back };
+            foreach (var dir in directions)
+            {
+                for (float dist = corridorWidth; dist <= corridorWidth * 5; dist += corridorWidth)
+                {
+                    Vector3 test = point + dir * dist;
+                    if (!IsInsideAnyRoom(test)) return test;
+                }
+            }
+            return point;
+        }
+
         private List<Vector3> StrictRoomAvoidance(List<Vector3> pathPoints)
         {
             if (pathPoints.Count < 3) return pathPoints;
 
-            List<Vector3> result = new List<Vector3> { pathPoints[0] }; // Keep start
-
+            List<Vector3> result = new List<Vector3> { pathPoints[0] };
             for (int i = 1; i < pathPoints.Count - 1; i++)
             {
                 Vector3 point = pathPoints[i];
-
                 if (IsInsideAnyRoom(point))
                 {
-                    // Push point out of room
                     Vector3 pushed = PushPointOutOfRooms(point);
-                    if (!IsInsideAnyRoom(pushed))
-                        result.Add(pushed);
-                    // Skip point if can't push out
+                    if (!IsInsideAnyRoom(pushed)) result.Add(pushed);
                 }
                 else
                 {
                     result.Add(point);
                 }
             }
-
-            result.Add(pathPoints[pathPoints.Count - 1]); // Keep end
+            result.Add(pathPoints[pathPoints.Count - 1]);
             return result;
         }
 
-        /// <summary>
-        /// Push a point outside of all rooms
-        /// </summary>
-        private Vector3 PushPointOutOfRooms(Vector3 point)
-        {
-            Vector3[] directions = { Vector3.right, Vector3.left, Vector3.forward, Vector3.back };
+        // ===================== Path Calculation =====================
 
-            foreach (var dir in directions)
-            {
-                for (float dist = corridorWidth; dist <= corridorWidth * 5; dist += corridorWidth)
-                {
-                    Vector3 test = point + dir * dist;
-                    if (!IsInsideAnyRoom(test))
-                        return test;
-                }
-            }
-
-            return point; // Couldn't push out, return original
-        }
-
-        /// <summary>
-        /// Generate clean path with minimal segments
-        /// </summary>
-        private List<Vector3> GenerateCleanPath(List<Vector3> waypoints)
-        {
-            List<Vector3> points = new List<Vector3>();
-
-            for (int w = 0; w < waypoints.Count - 1; w++)
-            {
-                Vector3 segStart = waypoints[w];
-                Vector3 segEnd = waypoints[w + 1];
-                float dist = Vector3.Distance(segStart, segEnd);
-
-                // Use fewer segments - just 1 per unit of distance, minimum 2
-                int segments = Mathf.Max(2, Mathf.CeilToInt(dist / 2f));
-
-                int startIdx = (w == 0) ? 0 : 1;
-                for (int i = startIdx; i <= segments; i++)
-                {
-                    float t = i / (float)segments;
-                    points.Add(Vector3.Lerp(segStart, segEnd, t));
-                }
-            }
-
-            return points;
-        }
-
-        /// <summary>
-        /// Create clean corridor mesh with proper geometry
-        /// </summary>
-        private void CreateCleanCorridorMesh(GameObject parent, List<Vector3> pathPoints)
-        {
-            if (pathPoints.Count < 2) return;
-
-            float halfWidth = corridorWidth / 2f;
-            List<Vector3> vertices = new List<Vector3>();
-            List<Face> faces = new List<Face>();
-
-            // Calculate perpendicular vectors for each point
-            List<Vector3> leftPoints = new List<Vector3>();
-            List<Vector3> rightPoints = new List<Vector3>();
-
-            for (int i = 0; i < pathPoints.Count; i++)
-            {
-                Vector3 pos = pathPoints[i];
-                Vector3 forward;
-
-                // Calculate forward direction
-                if (i == 0)
-                    forward = (pathPoints[1] - pathPoints[0]).normalized;
-                else if (i == pathPoints.Count - 1)
-                    forward = (pathPoints[i] - pathPoints[i - 1]).normalized;
-                else
-                {
-                    // Average direction at corners for smoother transition
-                    Vector3 prev = (pathPoints[i] - pathPoints[i - 1]).normalized;
-                    Vector3 next = (pathPoints[i + 1] - pathPoints[i]).normalized;
-                    forward = ((prev + next) / 2f).normalized;
-                }
-
-                Vector3 right = Vector3.Cross(Vector3.up, forward).normalized * halfWidth;
-
-                leftPoints.Add(pos - right);
-                rightPoints.Add(pos + right);
-            }
-
-            // Build floor
-            int vertOffset = 0;
-            for (int i = 0; i < pathPoints.Count - 1; i++)
-            {
-                vertices.Add(leftPoints[i]);
-                vertices.Add(rightPoints[i]);
-                vertices.Add(rightPoints[i + 1]);
-                vertices.Add(leftPoints[i + 1]);
-                faces.Add(new Face(new int[] { vertOffset, vertOffset + 3, vertOffset + 2, vertOffset, vertOffset + 2, vertOffset + 1 }));
-                vertOffset += 4;
-            }
-
-            // Build ceiling
-            for (int i = 0; i < pathPoints.Count - 1; i++)
-            {
-                Vector3 h = Vector3.up * wallHeight;
-                vertices.Add(leftPoints[i] + h);
-                vertices.Add(rightPoints[i] + h);
-                vertices.Add(rightPoints[i + 1] + h);
-                vertices.Add(leftPoints[i + 1] + h);
-                faces.Add(new Face(new int[] { vertOffset, vertOffset + 1, vertOffset + 2, vertOffset, vertOffset + 2, vertOffset + 3 }));
-                vertOffset += 4;
-            }
-
-            // Build left wall
-            for (int i = 0; i < pathPoints.Count - 1; i++)
-            {
-                Vector3 h = Vector3.up * wallHeight;
-                vertices.Add(leftPoints[i]);
-                vertices.Add(leftPoints[i + 1]);
-                vertices.Add(leftPoints[i + 1] + h);
-                vertices.Add(leftPoints[i] + h);
-                faces.Add(new Face(new int[] { vertOffset, vertOffset + 1, vertOffset + 2, vertOffset, vertOffset + 2, vertOffset + 3 }));
-                vertOffset += 4;
-            }
-
-            // Build right wall
-            for (int i = 0; i < pathPoints.Count - 1; i++)
-            {
-                Vector3 h = Vector3.up * wallHeight;
-                vertices.Add(rightPoints[i]);
-                vertices.Add(rightPoints[i + 1]);
-                vertices.Add(rightPoints[i + 1] + h);
-                vertices.Add(rightPoints[i] + h);
-                faces.Add(new Face(new int[] { vertOffset, vertOffset + 3, vertOffset + 2, vertOffset, vertOffset + 2, vertOffset + 1 }));
-                vertOffset += 4;
-            }
-
-            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices.ToArray(), faces.ToArray());
-            pbMesh.gameObject.transform.SetParent(parent.transform);
-            pbMesh.gameObject.transform.localPosition = Vector3.zero;
-            pbMesh.gameObject.name = "CorridorMesh";
-
-            var renderer = pbMesh.GetComponent<MeshRenderer>();
-            if (renderer != null)
-                renderer.sharedMaterial = floorMaterial;
-
-            pbMesh.ToMesh();
-            pbMesh.Refresh();
-        }
-
-        /// <summary>
-        /// Calculate the corner point for an L-shaped corridor
-        /// </summary>
         private Vector3 CalculateCornerPoint(Vector3 start, Vector3 startDir, Vector3 end, Vector3 endDir)
         {
-            // Determine corner based on primary directions
             bool startIsHorizontal = Mathf.Abs(startDir.x) > Mathf.Abs(startDir.z);
             bool endIsHorizontal = Mathf.Abs(endDir.x) > Mathf.Abs(endDir.z);
 
             if (startIsHorizontal != endIsHorizontal)
             {
-                // Perpendicular - simple L-shape
+                // Perpendicular directions - clean L-shape
                 if (startIsHorizontal)
                     return new Vector3(end.x, start.y, start.z);
                 else
@@ -442,55 +191,173 @@ namespace RpgTalentTree.Core.Dungeon
             }
             else
             {
-                // Same axis - use midpoint for U-shape
-                if (startIsHorizontal)
-                    return new Vector3((start.x + end.x) / 2f, start.y, (start.z + end.z) / 2f);
-                else
-                    return new Vector3((start.x + end.x) / 2f, start.y, (start.z + end.z) / 2f);
+                // Same axis - midpoint for U-shape
+                return new Vector3(
+                    (start.x + end.x) / 2f,
+                    start.y,
+                    (start.z + end.z) / 2f);
             }
         }
 
-        /// <summary>
-        /// Generate evenly spaced points along an L-shaped path
-        /// </summary>
-        private List<Vector3> GenerateLShapePath(Vector3 start, Vector3 corner, Vector3 end, int segmentsPerUnit)
+        private List<Vector3> CalculateRoomAvoidingPath(Vector3 start, Vector3 startDir, Vector3 end, Vector3 endDir)
         {
-            List<Vector3> points = new List<Vector3>();
+            List<Vector3> waypoints = new List<Vector3>();
+            waypoints.Add(start);
 
-            float dist1 = Vector3.Distance(start, corner);
-            float dist2 = Vector3.Distance(corner, end);
-            float totalDist = dist1 + dist2;
+            Vector3 startClearance = start + startDir * (corridorWidth + 1);
+            Vector3 endClearance = end + endDir * (corridorWidth + 1);
 
-            // Calculate segment count based on distance
-            int totalSegments = Mathf.Max(4, Mathf.RoundToInt(totalDist * segmentsPerUnit));
-            int seg1 = Mathf.Max(2, Mathf.RoundToInt(totalSegments * (dist1 / totalDist)));
-            int seg2 = Mathf.Max(2, totalSegments - seg1);
+            waypoints.Add(startClearance);
 
-            // First segment: start to corner
-            for (int i = 0; i <= seg1; i++)
+            Vector3 corner = FindSafeCorner(startClearance, endClearance, startDir, endDir);
+            if (SegmentIntersectsRoom(startClearance, corner) || SegmentIntersectsRoom(corner, endClearance))
             {
-                float t = i / (float)seg1;
-                points.Add(Vector3.Lerp(start, corner, t));
+                corner = FindAlternativeCorner(startClearance, endClearance, startDir, endDir);
             }
 
-            // Second segment: corner to end (skip first point to avoid duplicate)
-            for (int i = 1; i <= seg2; i++)
+            if (Vector3.Distance(corner, startClearance) > 1f && Vector3.Distance(corner, endClearance) > 1f)
             {
-                float t = i / (float)seg2;
-                points.Add(Vector3.Lerp(corner, end, t));
+                waypoints.Add(corner);
             }
 
-            return points;
+            waypoints.Add(endClearance);
+            waypoints.Add(end);
+
+            waypoints = StrictRoomAvoidance(waypoints);
+            return waypoints;
         }
 
+        // ===================== Grid-Based Pathfinding =====================
+
         /// <summary>
-        /// Create a curved corridor using Bezier spline (kept for compatibility)
+        /// Find a corridor path using the dungeon grid A* pathfinding.
+        /// Returns world-space waypoints (simplified to turns only), or null if grid unavailable / no path found.
+        /// Marks the path on the grid to prevent future corridors from overlapping.
         /// </summary>
-        public GameObject CreateSplineCorridor(Vector3 startPos, Vector3 startDir, Vector3 endPos, Vector3 endDir, Transform parent, int corridorIndex, int segments = 8)
+        private List<Vector3> FindGridPath(Vector3 startPos, Vector3 endPos)
         {
-            if (Vector3.Distance(startPos, endPos) < 0.1f)
+            if (grid == null) return null;
+
+            Vector2Int gridStart = grid.WorldToGrid(startPos.x, startPos.z);
+            Vector2Int gridEnd = grid.WorldToGrid(endPos.x, endPos.z);
+
+            int halfWidth = Mathf.CeilToInt(corridorWidth / (2f * grid.CellSize));
+
+            List<Vector2Int> gridPath = grid.FindPath(gridStart, gridEnd, halfWidth);
+            if (gridPath == null || gridPath.Count < 2)
                 return null;
 
+            // Mark corridor footprint on grid (prevents future overlap)
+            grid.MarkCorridorPath(gridPath, halfWidth);
+
+            // Simplify cell-by-cell path to waypoints at turn points
+            float worldY = (startPos.y + endPos.y) / 2f;
+            List<Vector3> waypoints = grid.SimplifyPath(gridPath, worldY);
+
+            if (waypoints == null || waypoints.Count < 2)
+                return null;
+
+            // Replace first/last waypoints with exact doorway positions
+            waypoints[0] = startPos;
+            waypoints[waypoints.Count - 1] = endPos;
+
+            return waypoints;
+        }
+
+        /// <summary>
+        /// Mark a legacy (non-grid) corridor path on the grid to prevent future corridors from overlapping it.
+        /// Samples points along each segment and marks their grid cells as Corridor.
+        /// </summary>
+        private void MarkLegacyPathOnGrid(List<Vector3> waypoints)
+        {
+            if (grid == null || waypoints == null || waypoints.Count < 2) return;
+
+            int halfWidth = Mathf.CeilToInt(corridorWidth / (2f * grid.CellSize));
+
+            for (int i = 0; i < waypoints.Count - 1; i++)
+            {
+                Vector3 a = waypoints[i];
+                Vector3 b = waypoints[i + 1];
+                float dist = Vector3.Distance(a, b);
+                int steps = Mathf.Max(2, Mathf.CeilToInt(dist / grid.CellSize));
+
+                var pathCells = new List<Vector2Int>();
+                for (int s = 0; s <= steps; s++)
+                {
+                    Vector3 p = Vector3.Lerp(a, b, s / (float)steps);
+                    Vector2Int cell = grid.WorldToGrid(p.x, p.z);
+                    if (!pathCells.Contains(cell))
+                        pathCells.Add(cell);
+                }
+
+                grid.MarkCorridorPath(pathCells, halfWidth);
+            }
+        }
+
+        // ===================== L-Shaped Corridor =====================
+
+        /// <summary>
+        /// Create an L-shaped corridor with proper cube-based geometry.
+        /// Uses grid-based A* pathfinding when grid is available (prevents overlapping).
+        /// Falls back to legacy room-avoidance method otherwise.
+        /// </summary>
+        public GameObject CreateLShapedCorridor(Vector3 startPos, Vector3 startDir, Vector3 endPos, Vector3 endDir,
+            Transform parent, int corridorIndex, int segmentsPerUnit = 2)
+        {
+            if (Vector3.Distance(startPos, endPos) < 0.1f) return null;
+
+            // Try grid-based pathfinding first (overlap-free, maze-like)
+            List<Vector3> waypoints = FindGridPath(startPos, endPos);
+
+            // Fallback to legacy room avoidance
+            if (waypoints == null || waypoints.Count < 2)
+            {
+                waypoints = CalculateRoomAvoidingPath(startPos, startDir, endPos, endDir);
+                // Mark legacy path on grid so future corridors avoid it
+                MarkLegacyPathOnGrid(waypoints);
+            }
+
+            if (waypoints.Count < 2) return null;
+
+            // Create corridor game object
+            GameObject corridorObj = new GameObject($"Corridor_{corridorIndex}");
+            corridorObj.transform.SetParent(parent);
+            corridorObj.transform.position = Vector3.zero;
+
+            // Build tunnel segments between consecutive waypoints
+            for (int i = 0; i < waypoints.Count - 1; i++)
+            {
+                CreateTunnelSegment(corridorObj, waypoints[i], waypoints[i + 1], $"Seg{i}");
+            }
+
+            // Floor/ceiling at internal corners to fill gaps
+            for (int i = 1; i < waypoints.Count - 1; i++)
+            {
+                CreateCornerPiece(corridorObj, waypoints[i], $"Turn{i}");
+            }
+
+            corridorPaths.Add(new CorridorPath(waypoints, corridorIndex, corridorObj));
+            return corridorObj;
+        }
+
+        // ===================== Spline Corridor =====================
+
+        /// <summary>
+        /// Create a curved corridor using Bezier spline with cube segments.
+        /// Uses grid pathfinding when available, falls back to spline.
+        /// </summary>
+        public GameObject CreateSplineCorridor(Vector3 startPos, Vector3 startDir, Vector3 endPos, Vector3 endDir,
+            Transform parent, int corridorIndex, int segments = 8)
+        {
+            if (Vector3.Distance(startPos, endPos) < 0.1f) return null;
+
+            // When grid is available, delegate to grid-aligned corridor (prevents overlap)
+            if (grid != null)
+            {
+                return CreateLShapedCorridor(startPos, startDir, endPos, endDir, parent, corridorIndex, segments);
+            }
+
+            // Fallback to spline path (no grid available)
             float dist = Vector3.Distance(startPos, endPos);
             float controlDist = dist * 0.4f;
 
@@ -506,459 +373,368 @@ namespace RpgTalentTree.Core.Dungeon
                 splinePoints.Add(CubicBezier(p0, p1, p2, p3, t));
             }
 
-            List<Vector3> intersections = FindIntersections(splinePoints);
-            foreach (var intersection in intersections)
-            {
-                bool exists = junctionPoints.Exists(p => Vector3.Distance(p, intersection) < corridorWidth);
-                if (!exists)
-                    junctionPoints.Add(intersection);
-            }
+            // Mark spline path on grid so future corridors avoid it
+            MarkLegacyPathOnGrid(splinePoints);
 
+            // Create corridor
             GameObject corridorObj = new GameObject($"SplineCorridor_{corridorIndex}");
             corridorObj.transform.SetParent(parent);
             corridorObj.transform.position = Vector3.zero;
 
-            CreateSplineCorridorMesh(corridorObj, splinePoints);
-            corridorPaths.Add(new CorridorPath(splinePoints, corridorIndex, corridorObj));
+            // Build tunnel segments along spline
+            for (int i = 0; i < splinePoints.Count - 1; i++)
+            {
+                CreateTunnelSegment(corridorObj, splinePoints[i], splinePoints[i + 1], $"Seg{i}");
+            }
 
+            corridorPaths.Add(new CorridorPath(splinePoints, corridorIndex, corridorObj));
             return corridorObj;
         }
 
-        /// <summary>
-        /// Find intersection points between a new path and existing paths
-        /// </summary>
-        private List<Vector3> FindIntersections(List<Vector3> newPath)
-        {
-            List<Vector3> intersections = new List<Vector3>();
-            float threshold = corridorWidth * 1.5f;
-
-            foreach (var existingPath in corridorPaths)
-            {
-                for (int i = 0; i < newPath.Count; i++)
-                {
-                    for (int j = 0; j < existingPath.Points.Count; j++)
-                    {
-                        float dist = Vector3.Distance(newPath[i], existingPath.Points[j]);
-                        if (dist < threshold && dist > 0.1f)
-                        {
-                            // Found intersection - use midpoint
-                            Vector3 intersection = (newPath[i] + existingPath.Points[j]) / 2f;
-
-                            // Check if we already have a nearby intersection
-                            bool duplicate = false;
-                            foreach (var existing in intersections)
-                            {
-                                if (Vector3.Distance(existing, intersection) < threshold)
-                                {
-                                    duplicate = true;
-                                    break;
-                                }
-                            }
-                            if (!duplicate)
-                                intersections.Add(intersection);
-                        }
-                    }
-                }
-            }
-
-            return intersections;
-        }
-
-        /// <summary>
-        /// Create junction pieces at all intersection points
-        /// </summary>
-        public void CreateJunctions(Transform parent)
-        {
-            for (int i = 0; i < junctionPoints.Count; i++)
-            {
-                CreateJunctionPiece(junctionPoints[i], parent, i);
-            }
-        }
-
-        /// <summary>
-        /// Create a junction piece (open hub) at intersection
-        /// </summary>
-        private void CreateJunctionPiece(Vector3 position, Transform parent, int index)
-        {
-            GameObject junctionObj = new GameObject($"Junction_{index}");
-            junctionObj.transform.SetParent(parent);
-            junctionObj.transform.position = position;
-
-            float size = corridorWidth * 1.5f;
-            float halfSize = size / 2f;
-
-            // Create octagonal junction floor and ceiling
-            List<Vector3> vertices = new List<Vector3>();
-            List<Face> faces = new List<Face>();
-
-            // 8-sided floor
-            int sides = 8;
-            Vector3[] floorVerts = new Vector3[sides + 1];
-            Vector3[] ceilingVerts = new Vector3[sides + 1];
-
-            floorVerts[0] = Vector3.zero;
-            ceilingVerts[0] = Vector3.up * wallHeight;
-
-            for (int i = 0; i < sides; i++)
-            {
-                float angle = i * Mathf.PI * 2 / sides;
-                floorVerts[i + 1] = new Vector3(Mathf.Cos(angle) * halfSize, 0, Mathf.Sin(angle) * halfSize);
-                ceilingVerts[i + 1] = floorVerts[i + 1] + Vector3.up * wallHeight;
-            }
-
-            // Add floor vertices
-            vertices.AddRange(floorVerts);
-
-            // Add floor faces (triangle fan)
-            for (int i = 1; i <= sides; i++)
-            {
-                int next = i % sides + 1;
-                faces.Add(new Face(new int[] { 0, next, i }));
-            }
-
-            // Add ceiling vertices
-            int ceilingOffset = vertices.Count;
-            vertices.AddRange(ceilingVerts);
-
-            // Add ceiling faces
-            for (int i = 1; i <= sides; i++)
-            {
-                int next = i % sides + 1;
-                faces.Add(new Face(new int[] { ceilingOffset, ceilingOffset + i, ceilingOffset + next }));
-            }
-
-            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices.ToArray(), faces.ToArray());
-            pbMesh.gameObject.transform.SetParent(junctionObj.transform);
-            pbMesh.gameObject.transform.localPosition = Vector3.zero;
-            pbMesh.gameObject.name = "JunctionMesh";
-
-            var renderer = pbMesh.GetComponent<MeshRenderer>();
-            if (renderer != null)
-                renderer.sharedMaterial = floorMaterial;
-
-            pbMesh.ToMesh();
-            pbMesh.Refresh();
-        }
-
-        /// <summary>
-        /// Cubic Bezier interpolation
-        /// </summary>
         private Vector3 CubicBezier(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
         {
             float u = 1 - t;
-            float tt = t * t;
-            float uu = u * u;
-            float uuu = uu * u;
-            float ttt = tt * t;
-
-            return uuu * p0 + 3 * uu * t * p1 + 3 * u * tt * p2 + ttt * p3;
+            return u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3;
         }
 
-        /// <summary>
-        /// Create corridor mesh along spline points
-        /// </summary>
-        private void CreateSplineCorridorMesh(GameObject parent, List<Vector3> splinePoints)
-        {
-            float halfWidth = corridorWidth / 2f;
-            List<Vector3> vertices = new List<Vector3>();
-            List<Face> faces = new List<Face>();
-
-            // Generate cross-sections along spline
-            List<Vector3> leftFloor = new List<Vector3>();
-            List<Vector3> rightFloor = new List<Vector3>();
-            List<Vector3> leftCeiling = new List<Vector3>();
-            List<Vector3> rightCeiling = new List<Vector3>();
-
-            for (int i = 0; i < splinePoints.Count; i++)
-            {
-                Vector3 pos = splinePoints[i];
-                Vector3 forward;
-
-                if (i < splinePoints.Count - 1)
-                    forward = (splinePoints[i + 1] - pos).normalized;
-                else
-                    forward = (pos - splinePoints[i - 1]).normalized;
-
-                Vector3 right = Vector3.Cross(Vector3.up, forward).normalized * halfWidth;
-
-                leftFloor.Add(pos - right);
-                rightFloor.Add(pos + right);
-                leftCeiling.Add(pos - right + Vector3.up * wallHeight);
-                rightCeiling.Add(pos + right + Vector3.up * wallHeight);
-            }
-
-            // Build floor quads
-            int vertOffset = 0;
-            for (int i = 0; i < splinePoints.Count - 1; i++)
-            {
-                vertices.Add(leftFloor[i]);
-                vertices.Add(rightFloor[i]);
-                vertices.Add(rightFloor[i + 1]);
-                vertices.Add(leftFloor[i + 1]);
-                faces.Add(new Face(new int[] { vertOffset, vertOffset + 3, vertOffset + 2, vertOffset, vertOffset + 2, vertOffset + 1 }));
-                vertOffset += 4;
-            }
-
-            // Build ceiling quads
-            for (int i = 0; i < splinePoints.Count - 1; i++)
-            {
-                vertices.Add(leftCeiling[i]);
-                vertices.Add(rightCeiling[i]);
-                vertices.Add(rightCeiling[i + 1]);
-                vertices.Add(leftCeiling[i + 1]);
-                faces.Add(new Face(new int[] { vertOffset, vertOffset + 1, vertOffset + 2, vertOffset, vertOffset + 2, vertOffset + 3 }));
-                vertOffset += 4;
-            }
-
-            // Build left wall quads
-            for (int i = 0; i < splinePoints.Count - 1; i++)
-            {
-                vertices.Add(leftFloor[i]);
-                vertices.Add(leftFloor[i + 1]);
-                vertices.Add(leftCeiling[i + 1]);
-                vertices.Add(leftCeiling[i]);
-                faces.Add(new Face(new int[] { vertOffset, vertOffset + 1, vertOffset + 2, vertOffset, vertOffset + 2, vertOffset + 3 }));
-                vertOffset += 4;
-            }
-
-            // Build right wall quads
-            for (int i = 0; i < splinePoints.Count - 1; i++)
-            {
-                vertices.Add(rightFloor[i]);
-                vertices.Add(rightFloor[i + 1]);
-                vertices.Add(rightCeiling[i + 1]);
-                vertices.Add(rightCeiling[i]);
-                faces.Add(new Face(new int[] { vertOffset, vertOffset + 3, vertOffset + 2, vertOffset, vertOffset + 2, vertOffset + 1 }));
-                vertOffset += 4;
-            }
-
-            // Create ProBuilder mesh
-            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices.ToArray(), faces.ToArray());
-            pbMesh.gameObject.transform.SetParent(parent.transform);
-            pbMesh.gameObject.transform.localPosition = Vector3.zero;
-            pbMesh.gameObject.name = "SplineMesh";
-
-            var renderer = pbMesh.GetComponent<MeshRenderer>();
-            if (renderer != null)
-                renderer.sharedMaterial = floorMaterial;
-
-            pbMesh.ToMesh();
-            pbMesh.Refresh();
-        }
+        // ===================== Straight Corridor Segment =====================
 
         /// <summary>
-        /// Create a complete corridor segment with floor, walls, and ceiling as a single mesh
+        /// Create a simple straight corridor between two points
         /// </summary>
         public GameObject CreateCorridor(Vector3 start, Vector3 end, Transform parent, int corridorIndex, string direction)
         {
-            if (Vector3.Distance(start, end) < 0.1f)
-                return null;
+            if (Vector3.Distance(start, end) < 0.1f) return null;
 
             GameObject corridorObj = new GameObject($"Corridor_{corridorIndex}_{direction}");
             corridorObj.transform.SetParent(parent);
-            corridorObj.transform.position = start;
+            corridorObj.transform.position = Vector3.zero;
 
-            Vector3 localEnd = end - start;
-            float distance = localEnd.magnitude;
-            Vector3 dir = localEnd.normalized;
-
-            // Determine corridor orientation
-            bool isHorizontalX = Mathf.Abs(dir.x) > Mathf.Abs(dir.z);
-
-            // Create single unified mesh for entire corridor
-            CreateUnifiedCorridorMesh(corridorObj, distance, isHorizontalX, dir);
-
+            CreateTunnelSegment(corridorObj, start, end, "Seg0");
             return corridorObj;
         }
 
-        /// <summary>
-        /// Create unified corridor mesh with floor, walls, and ceiling
-        /// </summary>
-        private void CreateUnifiedCorridorMesh(GameObject parent, float distance, bool isHorizontalX, Vector3 dir)
-        {
-            GameObject meshObj = new GameObject("CorridorMesh");
-            meshObj.transform.SetParent(parent.transform);
-            meshObj.transform.localPosition = Vector3.zero;
-
-            float halfWidth = corridorWidth / 2f;
-            List<Vector3> vertices = new List<Vector3>();
-            List<Face> faces = new List<Face>();
-            int vertexOffset = 0;
-
-            // Build floor
-            Vector3[] floorVerts = isHorizontalX
-                ? new Vector3[] {
-                    new Vector3(0, 0, -halfWidth),
-                    new Vector3(distance, 0, -halfWidth),
-                    new Vector3(distance, 0, halfWidth),
-                    new Vector3(0, 0, halfWidth)
-                }
-                : new Vector3[] {
-                    new Vector3(-halfWidth, 0, 0),
-                    new Vector3(halfWidth, 0, 0),
-                    new Vector3(halfWidth, 0, distance),
-                    new Vector3(-halfWidth, 0, distance)
-                };
-
-            vertices.AddRange(floorVerts);
-            faces.Add(new Face(new int[] { 0, 3, 2, 0, 2, 1 }));
-            vertexOffset += 4;
-
-            // Build ceiling
-            Vector3[] ceilingVerts = new Vector3[4];
-            for (int i = 0; i < 4; i++)
-            {
-                ceilingVerts[i] = floorVerts[i] + Vector3.up * wallHeight;
-            }
-            vertices.AddRange(ceilingVerts);
-            faces.Add(new Face(new int[] {
-                vertexOffset + 0,
-                vertexOffset + 2,
-                vertexOffset + 1,
-                vertexOffset + 0,
-                vertexOffset + 3,
-                vertexOffset + 2
-            }));
-            vertexOffset += 4;
-
-            // Build walls (left and right)
-            if (isHorizontalX)
-            {
-                // Left wall (negative Z)
-                AddWallToMesh(vertices, faces, ref vertexOffset,
-                    new Vector3(0, 0, -halfWidth),
-                    new Vector3(distance, 0, -halfWidth),
-                    new Vector3(-dir.z, 0, dir.x));
-
-                // Right wall (positive Z)
-                AddWallToMesh(vertices, faces, ref vertexOffset,
-                    new Vector3(0, 0, halfWidth),
-                    new Vector3(distance, 0, halfWidth),
-                    new Vector3(-dir.z, 0, dir.x));
-            }
-            else
-            {
-                // Left wall (negative X)
-                AddWallToMesh(vertices, faces, ref vertexOffset,
-                    new Vector3(-halfWidth, 0, 0),
-                    new Vector3(-halfWidth, 0, distance),
-                    new Vector3(-dir.z, 0, dir.x));
-
-                // Right wall (positive X)
-                AddWallToMesh(vertices, faces, ref vertexOffset,
-                    new Vector3(halfWidth, 0, 0),
-                    new Vector3(halfWidth, 0, distance),
-                    new Vector3(-dir.z, 0, dir.x));
-            }
-
-            // Create ProBuilder mesh
-            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices.ToArray(), faces.ToArray());
-            pbMesh.gameObject.transform.SetParent(meshObj.transform);
-            pbMesh.gameObject.transform.localPosition = Vector3.zero;
-            pbMesh.gameObject.name = "UnifiedMesh";
-
-            // Apply materials
-            ApplyMaterialsToFaces(pbMesh);
-
-            pbMesh.ToMesh();
-            pbMesh.Refresh();
-        }
+        // ===================== Corner Piece =====================
 
         /// <summary>
-        /// Add wall vertices and faces to the mesh
-        /// </summary>
-        private void AddWallToMesh(List<Vector3> vertices, List<Face> faces, ref int vertexOffset,
-            Vector3 start, Vector3 end, Vector3 perpendicular)
-        {
-            Vector3 thickness = perpendicular.normalized * wallThickness;
-
-            // Wall vertices (4 bottom + 4 top)
-            vertices.Add(start);
-            vertices.Add(start + thickness);
-            vertices.Add(end + thickness);
-            vertices.Add(end);
-            vertices.Add(start + Vector3.up * wallHeight);
-            vertices.Add(start + thickness + Vector3.up * wallHeight);
-            vertices.Add(end + thickness + Vector3.up * wallHeight);
-            vertices.Add(end + Vector3.up * wallHeight);
-
-            // Wall faces
-            int v = vertexOffset;
-            faces.Add(new Face(new int[] { v+0, v+1, v+5, v+0, v+5, v+4 })); // Front
-            faces.Add(new Face(new int[] { v+1, v+2, v+6, v+1, v+6, v+5 })); // Right
-            faces.Add(new Face(new int[] { v+2, v+3, v+7, v+2, v+7, v+6 })); // Back
-            faces.Add(new Face(new int[] { v+3, v+0, v+4, v+3, v+4, v+7 })); // Left
-
-            vertexOffset += 8;
-        }
-
-        /// <summary>
-        /// Apply materials to different parts of the corridor mesh
-        /// </summary>
-        private void ApplyMaterialsToFaces(ProBuilderMesh pbMesh)
-        {
-            var renderer = pbMesh.GetComponent<MeshRenderer>();
-            if (renderer != null)
-            {
-                // For now, use single material for entire corridor
-                // Can be enhanced later to use different materials per face
-                renderer.sharedMaterial = floorMaterial;
-            }
-        }
-
-        /// <summary>
-        /// Create a corner piece to connect two perpendicular corridor segments as unified mesh
+        /// Create a corner piece to connect two perpendicular corridor segments
         /// </summary>
         public GameObject CreateCorridorCorner(Vector3 cornerPosition, Transform parent, int corridorIndex)
         {
             GameObject cornerObj = new GameObject($"CorridorCorner_{corridorIndex}");
             cornerObj.transform.SetParent(parent);
-            cornerObj.transform.position = cornerPosition;
+            cornerObj.transform.position = Vector3.zero;
 
-            float halfWidth = corridorWidth / 2f;
-            List<Vector3> vertices = new List<Vector3>();
-            List<Face> faces = new List<Face>();
-
-            // Corner floor vertices
-            Vector3[] floorVerts = new Vector3[] {
-                new Vector3(-halfWidth, 0, -halfWidth),
-                new Vector3(halfWidth, 0, -halfWidth),
-                new Vector3(halfWidth, 0, halfWidth),
-                new Vector3(-halfWidth, 0, halfWidth)
-            };
-            vertices.AddRange(floorVerts);
-            faces.Add(new Face(new int[] { 0, 3, 2, 0, 2, 1 }));
-
-            // Corner ceiling vertices
-            Vector3[] ceilingVerts = new Vector3[4];
-            for (int i = 0; i < 4; i++)
-            {
-                ceilingVerts[i] = floorVerts[i] + Vector3.up * wallHeight;
-            }
-            vertices.AddRange(ceilingVerts);
-            faces.Add(new Face(new int[] { 4, 6, 5, 4, 7, 6 }));
-
-            // Create unified mesh
-            GameObject meshObj = new GameObject("CornerMesh");
-            meshObj.transform.SetParent(cornerObj.transform);
-            meshObj.transform.localPosition = Vector3.zero;
-
-            ProBuilderMesh pbMesh = ProBuilderMesh.Create(vertices.ToArray(), faces.ToArray());
-            pbMesh.gameObject.transform.SetParent(meshObj.transform);
-            pbMesh.gameObject.transform.localPosition = Vector3.zero;
-            pbMesh.gameObject.name = "UnifiedCornerMesh";
-
-            // Apply material
-            var renderer = pbMesh.GetComponent<MeshRenderer>();
-            if (renderer != null)
-            {
-                renderer.sharedMaterial = floorMaterial;
-            }
-
-            pbMesh.ToMesh();
-            pbMesh.Refresh();
-
+            CreateCornerPiece(cornerObj, cornerPosition, "Corner");
             return cornerObj;
+        }
+
+        // ===================== Junction System =====================
+
+        /// <summary>
+        /// Post-process: detect actual corridor crossings by checking line segment intersections.
+        /// Only creates junction points where corridors genuinely cross each other geometrically.
+        /// Must be called after ALL corridors are created.
+        /// </summary>
+        public void DetectAllIntersections()
+        {
+            float mergeThreshold = corridorWidth * 1.5f;
+
+            for (int i = 0; i < corridorPaths.Count; i++)
+            {
+                for (int j = i + 1; j < corridorPaths.Count; j++)
+                {
+                    var pathA = corridorPaths[i].Points;
+                    var pathB = corridorPaths[j].Points;
+
+                    for (int ai = 0; ai < pathA.Count - 1; ai++)
+                    {
+                        for (int bi = 0; bi < pathB.Count - 1; bi++)
+                        {
+                            Vector2 a1 = new Vector2(pathA[ai].x, pathA[ai].z);
+                            Vector2 a2 = new Vector2(pathA[ai + 1].x, pathA[ai + 1].z);
+                            Vector2 b1 = new Vector2(pathB[bi].x, pathB[bi].z);
+                            Vector2 b2 = new Vector2(pathB[bi + 1].x, pathB[bi + 1].z);
+
+                            // Only detect actual geometric line segment crossings
+                            if (TryGetSegmentIntersection2D(a1, a2, b1, b2, out Vector2 hit))
+                            {
+                                float y = Mathf.Min(pathA[ai].y, pathB[bi].y);
+                                AddUniqueJunction(new Vector3(hit.x, y, hit.y), mergeThreshold);
+                            }
+
+                            // Tight proximity check - only for segments that physically overlap
+                            // (within half corridor width, meaning the passages occupy the same space)
+                            float closestDist = SegmentToSegmentDist2D(a1, a2, b1, b2);
+                            if (closestDist < corridorWidth * 0.3f)
+                            {
+                                // Find the closest points between the two segments
+                                Vector2 midA = (a1 + a2) / 2f;
+                                Vector2 midB = (b1 + b2) / 2f;
+                                float y = Mathf.Min(pathA[ai].y, pathB[bi].y);
+                                Vector3 jPoint = new Vector3(
+                                    (midA.x + midB.x) / 2f, y, (midA.y + midB.y) / 2f);
+                                AddUniqueJunction(jPoint, mergeThreshold);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Minimum distance between two 2D line segments
+        /// </summary>
+        private static float SegmentToSegmentDist2D(Vector2 a1, Vector2 a2, Vector2 b1, Vector2 b2)
+        {
+            // If they intersect, distance is 0
+            if (TryGetSegmentIntersection2D(a1, a2, b1, b2, out _))
+                return 0f;
+
+            // Otherwise check all four point-to-segment distances
+            float d1 = PointToSegmentDist2D(a1, b1, b2);
+            float d2 = PointToSegmentDist2D(a2, b1, b2);
+            float d3 = PointToSegmentDist2D(b1, a1, a2);
+            float d4 = PointToSegmentDist2D(b2, a1, a2);
+            return Mathf.Min(Mathf.Min(d1, d2), Mathf.Min(d3, d4));
+        }
+
+        private void AddUniqueJunction(Vector3 point, float mergeThreshold)
+        {
+            bool duplicate = junctionPoints.Exists(p => Vector3.Distance(p, point) < mergeThreshold);
+            if (!duplicate)
+                junctionPoints.Add(point);
+        }
+
+        /// <summary>
+        /// Remove wall chunk objects whose center is near a junction point.
+        /// Since tunnel segments are split into short chunks, only the small chunk
+        /// at the actual crossing gets its walls removed (not the entire corridor length).
+        /// Uses wall object world position for precise, localized removal.
+        /// </summary>
+        public void CleanWallsAtJunctions()
+        {
+            // Radius matches the short chunk length so only chunks AT the crossing are affected
+            float junctionRadius = corridorWidth * 1.5f;
+
+            foreach (var junction in junctionPoints)
+            {
+                Vector2 jPos = new Vector2(junction.x, junction.z);
+
+                foreach (var corridor in corridorPaths)
+                {
+                    if (corridor.CorridorObject == null) continue;
+
+                    // Collect wall objects near this junction by checking their actual world position
+                    var wallsToRemove = new List<GameObject>();
+                    foreach (Transform child in corridor.CorridorObject.transform)
+                    {
+                        if (!child.name.Contains("_WL") && !child.name.Contains("_WR"))
+                            continue;
+
+                        Vector2 wallPos = new Vector2(child.position.x, child.position.z);
+                        if (Vector2.Distance(wallPos, jPos) < junctionRadius)
+                        {
+                            wallsToRemove.Add(child.gameObject);
+                        }
+                    }
+
+                    foreach (var wall in wallsToRemove)
+                    {
+                        Object.DestroyImmediate(wall);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Create junction pieces (floor + ceiling, no walls) at all intersection points.
+        /// Call after DetectAllIntersections and CleanWallsAtJunctions.
+        /// </summary>
+        public void CreateJunctions(Transform parent)
+        {
+            for (int i = 0; i < junctionPoints.Count; i++)
+            {
+                GameObject junctionObj = new GameObject($"Junction_{i}");
+                junctionObj.transform.SetParent(parent);
+                junctionObj.transform.position = Vector3.zero;
+
+                float ft = 0.1f;
+                // Large enough to cover the crossing area of two corridors
+                float jSize = corridorWidth * 2f + wallThickness * 2f;
+
+                // Junction floor
+                PlaceCube(junctionObj, "JunctionFloor",
+                    junctionPoints[i] + Vector3.down * (ft / 2f),
+                    new Vector3(jSize, ft, jSize),
+                    Quaternion.identity, floorMaterial);
+
+                // Junction ceiling
+                PlaceCube(junctionObj, "JunctionCeiling",
+                    junctionPoints[i] + Vector3.up * (wallHeight + ft / 2f),
+                    new Vector3(jSize, ft, jSize),
+                    Quaternion.identity, ceilingMaterial);
+            }
+        }
+
+        // ===================== Geometry Helpers =====================
+
+        /// <summary>
+        /// Shortest distance from a point to a line segment in 2D (XZ plane)
+        /// </summary>
+        private static float PointToSegmentDist2D(Vector2 point, Vector2 segA, Vector2 segB)
+        {
+            Vector2 ab = segB - segA;
+            float lenSq = ab.sqrMagnitude;
+            if (lenSq < 0.001f) return Vector2.Distance(point, segA);
+
+            float t = Mathf.Clamp01(Vector2.Dot(point - segA, ab) / lenSq);
+            Vector2 projection = segA + t * ab;
+            return Vector2.Distance(point, projection);
+        }
+
+        /// <summary>
+        /// Check if two 2D line segments intersect, and return the intersection point
+        /// </summary>
+        private static bool TryGetSegmentIntersection2D(Vector2 a1, Vector2 a2, Vector2 b1, Vector2 b2, out Vector2 intersection)
+        {
+            intersection = Vector2.zero;
+
+            Vector2 d1 = a2 - a1;
+            Vector2 d2 = b2 - b1;
+
+            float cross = d1.x * d2.y - d1.y * d2.x;
+            if (Mathf.Abs(cross) < 0.001f) return false; // Parallel
+
+            Vector2 d = b1 - a1;
+            float t = (d.x * d2.y - d.y * d2.x) / cross;
+            float u = (d.x * d1.y - d.y * d1.x) / cross;
+
+            if (t >= 0f && t <= 1f && u >= 0f && u <= 1f)
+            {
+                intersection = a1 + t * d1;
+                return true;
+            }
+
+            return false;
+        }
+
+        // ===================== Mesh Creation Helpers =====================
+
+        /// <summary>
+        /// Create a tunnel segment split into short chunks for granular wall control.
+        /// Short chunks allow CleanWallsAtJunctions to remove only the walls near a crossing,
+        /// instead of stripping walls from an entire long segment.
+        /// </summary>
+        private void CreateTunnelSegment(GameObject parent, Vector3 start, Vector3 end, string name)
+        {
+            Vector3 delta = end - start;
+            Vector3 horizontalDelta = new Vector3(delta.x, 0, delta.z);
+            float length = horizontalDelta.magnitude;
+            if (length < 0.01f) return;
+
+            // Break long segments into short chunks (max ~2x corridorWidth each)
+            float maxChunkLen = corridorWidth * 2f;
+            int numChunks = Mathf.Max(1, Mathf.CeilToInt(length / maxChunkLen));
+
+            for (int c = 0; c < numChunks; c++)
+            {
+                float t0 = c / (float)numChunks;
+                float t1 = (c + 1) / (float)numChunks;
+                Vector3 chunkStart = Vector3.Lerp(start, end, t0);
+                Vector3 chunkEnd = Vector3.Lerp(start, end, t1);
+
+                CreateTunnelChunk(parent, chunkStart, chunkEnd, $"{name}_{c}");
+            }
+        }
+
+        /// <summary>
+        /// Create a single short tunnel chunk (floor + ceiling + walls) between two close points.
+        /// Each chunk gets its own wall cubes so they can be individually removed at junctions.
+        /// </summary>
+        private void CreateTunnelChunk(GameObject parent, Vector3 start, Vector3 end, string name)
+        {
+            Vector3 delta = end - start;
+            Vector3 horizontalDelta = new Vector3(delta.x, 0, delta.z);
+            float length = horizontalDelta.magnitude;
+            if (length < 0.01f) return;
+
+            Vector3 dir = horizontalDelta.normalized;
+            Vector3 right = Vector3.Cross(Vector3.up, dir).normalized;
+            Vector3 mid = (start + end) / 2f;
+            Quaternion rot = Quaternion.LookRotation(dir, Vector3.up);
+
+            float ft = 0.1f;
+            float halfW = corridorWidth / 2f;
+            float t = wallThickness;
+            float h = wallHeight;
+
+            // Floor slab
+            PlaceCube(parent, name + "_F",
+                mid + Vector3.down * (ft / 2f),
+                new Vector3(corridorWidth, ft, length),
+                rot, floorMaterial);
+
+            // Ceiling slab
+            PlaceCube(parent, name + "_C",
+                mid + Vector3.up * (h + ft / 2f),
+                new Vector3(corridorWidth, ft, length),
+                rot, ceilingMaterial);
+
+            // Left wall
+            PlaceCube(parent, name + "_WL",
+                mid + right * (-halfW - t / 2f) + Vector3.up * (h / 2f),
+                new Vector3(t, h, length),
+                rot, wallMaterial);
+
+            // Right wall
+            PlaceCube(parent, name + "_WR",
+                mid + right * (halfW + t / 2f) + Vector3.up * (h / 2f),
+                new Vector3(t, h, length),
+                rot, wallMaterial);
+        }
+
+        /// <summary>
+        /// Create a corner/turn piece (floor + ceiling) at a waypoint
+        /// </summary>
+        private void CreateCornerPiece(GameObject parent, Vector3 position, string name)
+        {
+            float ft = 0.1f;
+            float cornerSize = corridorWidth + 2 * wallThickness;
+
+            // Floor
+            PlaceCube(parent, name + "_F",
+                position + Vector3.down * (ft / 2f),
+                new Vector3(cornerSize, ft, cornerSize),
+                Quaternion.identity, floorMaterial);
+
+            // Ceiling
+            PlaceCube(parent, name + "_C",
+                position + Vector3.up * (wallHeight + ft / 2f),
+                new Vector3(cornerSize, ft, cornerSize),
+                Quaternion.identity, ceilingMaterial);
+        }
+
+        /// <summary>
+        /// Place a ProBuilder cube at the specified world position with rotation
+        /// </summary>
+        private void PlaceCube(GameObject parent, string name, Vector3 worldPos, Vector3 size,
+            Quaternion rotation, Material material)
+        {
+            var mesh = ShapeGenerator.GenerateCube(PivotLocation.Center, size);
+            mesh.gameObject.name = name;
+            mesh.gameObject.transform.SetParent(parent.transform);
+            mesh.gameObject.transform.position = worldPos;
+            mesh.gameObject.transform.rotation = rotation;
+
+            if (material != null)
+            {
+                var renderer = mesh.GetComponent<MeshRenderer>();
+                if (renderer != null) renderer.sharedMaterial = material;
+            }
+
+            mesh.ToMesh();
+            mesh.Refresh();
         }
     }
 }

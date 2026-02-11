@@ -28,7 +28,10 @@ namespace RpgTalentTree.Core.Dungeon
         [SerializeField] private int segmentsPerUnit = 2;
         [Tooltip("Maximum corridors per room (1-4)")]
         [Range(1, 4)]
-        [SerializeField] private int maxCorridorsPerRoom = 2;
+        [SerializeField] private int maxCorridorsPerRoom = 4;
+        [Tooltip("Chance (0-1) of creating extra connections between nearby rooms for maze effect")]
+        [Range(0f, 1f)]
+        [SerializeField] private float extraConnectionChance = 0.6f;
         [Tooltip("Maximum length before adding extra 90-degree corners")]
         [SerializeField] private float maxCorridorSegmentLength = 15f;
 
@@ -76,27 +79,8 @@ namespace RpgTalentTree.Core.Dungeon
         private StairsGenerator stairsGenerator;
         private CorridorGenerator corridorGenerator;
         private BSPNode bspRoot;
+        private DungeonGrid dungeonGrid;
 
-        // Track corridor segments for crossroad detection
-        private struct CorridorSegment
-        {
-            public Vector3 Start;
-            public Vector3 End;
-            public bool IsHorizontalX; // true if corridor runs along X axis
-            public bool IsHorizontalZ; // true if corridor runs along Z axis
-
-            public CorridorSegment(Vector3 start, Vector3 end)
-            {
-                Start = start;
-                End = end;
-                Vector3 dir = end - start;
-                IsHorizontalX = Mathf.Abs(dir.x) > Mathf.Abs(dir.z);
-                IsHorizontalZ = Mathf.Abs(dir.z) > Mathf.Abs(dir.x);
-            }
-        }
-
-        private List<CorridorSegment> corridorSegments = new List<CorridorSegment>();
-        private List<Vector3> crossroadPositions = new List<Vector3>();
         private List<DungeonMarker> dungeonMarkers = new List<DungeonMarker>();
 
         private void Start()
@@ -116,18 +100,48 @@ namespace RpgTalentTree.Core.Dungeon
             InitializeGenerator();
             GenerateRooms();
 
-            // Setup corridor generator with room collision data
+            // Setup grid for overlap-free corridor pathfinding
+            InitializeDungeonGrid();
+
+            // Setup corridor generator with room collision data and grid
             corridorGenerator?.ClearPaths();
+            corridorGenerator?.SetGrid(dungeonGrid);
             RegisterRoomBoundsForCorridors();
 
             GenerateCorridorsAndDoorways();
+
+            // Post-process: detect all intersections, clean overlapping walls, build junctions
+            corridorGenerator?.DetectAllIntersections();
+            corridorGenerator?.CleanWallsAtJunctions();
             corridorGenerator?.CreateJunctions(dungeonParent.transform);
+
             CreateRoomMeshes();
             GenerateMarkers();
             AddDecorations();
             OptimizeMeshes();
             int junctionCount = corridorGenerator?.GetJunctionPoints().Count ?? 0;
             Debug.Log($"Dungeon generated with {rooms.Count} rooms, {dungeonMarkers.Count} markers, {junctionCount} junctions");
+        }
+
+        /// <summary>
+        /// Create a 2D occupancy grid covering the dungeon area and mark all rooms.
+        /// The grid is used by CorridorGenerator for A* pathfinding that avoids overlap.
+        /// </summary>
+        private void InitializeDungeonGrid()
+        {
+            float minX = -dungeonWidth / 2f;
+            float minZ = -dungeonDepth / 2f;
+            float maxX = dungeonWidth / 2f;
+            float maxZ = dungeonDepth / 2f;
+
+            dungeonGrid = new DungeonGrid(minX, minZ, maxX, maxZ);
+
+            foreach (var room in rooms)
+            {
+                dungeonGrid.MarkRoom(room, wallThickness);
+            }
+
+            Debug.Log($"Dungeon grid initialized: {dungeonGrid.Width}x{dungeonGrid.Height} cells");
         }
 
         /// <summary>
@@ -168,9 +182,9 @@ namespace RpgTalentTree.Core.Dungeon
             }
 
             rooms.Clear();
-            corridorSegments.Clear();
-            crossroadPositions.Clear();
             dungeonMarkers.Clear();
+            dungeonGrid = null;
+            DungeonRoom.ResetIdCounter();
         }
 
         private void InitializeGenerator()
@@ -277,9 +291,20 @@ namespace RpgTalentTree.Core.Dungeon
                 return;
 
             int corridorIndex = 0;
-            ConnectBSPNodes(bspRoot, ref corridorIndex);
 
-            Debug.Log($"Created {corridorIndex} corridor connections using BSP tree");
+            // Phase 1: BSP spanning tree - mandatory connections guarantee reachability
+            ConnectBSPNodes(bspRoot, ref corridorIndex);
+            int bspCount = corridorIndex;
+
+            // Phase 2: Verify and fix full connectivity (BFS + force-connect isolates)
+            EnsureFullConnectivity(ref corridorIndex);
+            int fixCount = corridorIndex - bspCount;
+
+            // Phase 3: Extra connections between nearby rooms to create maze loops
+            AddExtraConnections(ref corridorIndex);
+            int extraCount = corridorIndex - bspCount - fixCount;
+
+            Debug.Log($"Created {corridorIndex} corridors ({bspCount} BSP, {fixCount} fixes, {extraCount} extra loops)");
         }
 
         /// <summary>
@@ -305,7 +330,7 @@ namespace RpgTalentTree.Core.Dungeon
 
                 if (leftRoom != null && rightRoom != null)
                 {
-                    ConnectRooms(leftRoom, rightRoom, corridorIndex++);
+                    ConnectRooms(leftRoom, rightRoom, corridorIndex++, true);
                 }
             }
         }
@@ -338,10 +363,15 @@ namespace RpgTalentTree.Core.Dungeon
         }
 
         /// <summary>
-        /// Connect two rooms with an L-shaped corridor (with optional stairs)
+        /// Connect two rooms with an L-shaped corridor (with optional stairs).
+        /// mandatory=true for BSP spanning tree connections (ignores maxCorridorsPerRoom limit).
         /// </summary>
-        private void ConnectRooms(DungeonRoom roomA, DungeonRoom roomB, int corridorIndex)
+        private void ConnectRooms(DungeonRoom roomA, DungeonRoom roomB, int corridorIndex, bool mandatory)
         {
+            // Skip if already connected
+            if (roomA.ConnectedRoomIds.Contains(roomB.Id))
+                return;
+
             Vector3 startPos = roomA.GetCenter();
             Vector3 endPos = roomB.GetCenter();
 
@@ -350,25 +380,24 @@ namespace RpgTalentTree.Core.Dungeon
 
             if (needsStairs)
             {
-                // Multi-level connection with stairs
-                ConnectRoomsWithStairs(roomA, roomB, corridorIndex, startPos, endPos);
+                ConnectRoomsWithStairs(roomA, roomB, corridorIndex, startPos, endPos, mandatory);
             }
             else
             {
-                // Same-level connection
-                ConnectRoomsSameLevel(roomA, roomB, corridorIndex, startPos, endPos);
+                ConnectRoomsSameLevel(roomA, roomB, corridorIndex, startPos, endPos, mandatory);
             }
         }
 
         /// <summary>
         /// Connect two rooms on the same level
         /// </summary>
-        private void ConnectRoomsSameLevel(DungeonRoom roomA, DungeonRoom roomB, int corridorIndex, Vector3 startPos, Vector3 endPos)
+        private void ConnectRoomsSameLevel(DungeonRoom roomA, DungeonRoom roomB, int corridorIndex, Vector3 startPos, Vector3 endPos, bool mandatory = false)
         {
-            // Check corridor limits
-            if (!CanAddCorridor(roomA) || !CanAddCorridor(roomB))
+            // Check corridor limits (mandatory connections bypass maxCorridorsPerRoom)
+            if (!CanAddCorridor(roomA, mandatory) || !CanAddCorridor(roomB, mandatory))
             {
-                Debug.Log($"Skipping corridor {corridorIndex}: max corridors reached");
+                if (!mandatory) return;
+                Debug.Log($"Skipping corridor {corridorIndex}: no available walls");
                 return;
             }
 
@@ -408,22 +437,26 @@ namespace RpgTalentTree.Core.Dungeon
         }
 
         /// <summary>
-        /// Check if room can accept more corridors
+        /// Check if room can accept more corridors.
+        /// mandatory=true bypasses the maxCorridorsPerRoom limit (still needs a free wall).
         /// </summary>
-        private bool CanAddCorridor(DungeonRoom room)
+        private bool CanAddCorridor(DungeonRoom room, bool mandatory = false)
         {
-            return room.ConnectedRoomIds.Count < maxCorridorsPerRoom && room.GetAvailableWallCount() > 0;
+            if (room.GetAvailableWallCount() == 0) return false;
+            if (!mandatory && room.ConnectedRoomIds.Count >= maxCorridorsPerRoom) return false;
+            return true;
         }
 
         /// <summary>
         /// Connect two rooms at different heights with stairs
         /// </summary>
-        private void ConnectRoomsWithStairs(DungeonRoom roomA, DungeonRoom roomB, int corridorIndex, Vector3 startPos, Vector3 endPos)
+        private void ConnectRoomsWithStairs(DungeonRoom roomA, DungeonRoom roomB, int corridorIndex, Vector3 startPos, Vector3 endPos, bool mandatory = false)
         {
-            // Check corridor limits
-            if (!CanAddCorridor(roomA) || !CanAddCorridor(roomB))
+            // Check corridor limits (mandatory connections bypass maxCorridorsPerRoom)
+            if (!CanAddCorridor(roomA, mandatory) || !CanAddCorridor(roomB, mandatory))
             {
-                Debug.Log($"Skipping stairs {corridorIndex}: max corridors reached");
+                if (!mandatory) return;
+                Debug.Log($"Skipping stairs {corridorIndex}: no available walls");
                 return;
             }
 
@@ -468,195 +501,120 @@ namespace RpgTalentTree.Core.Dungeon
         }
 
         /// <summary>
-        /// Find where a line from inside the room intersects with the room boundary
+        /// BFS connectivity check - find and fix any disconnected rooms.
+        /// Guarantees every room is reachable from every other room.
         /// </summary>
-        private Vector3 FindRoomBoundaryIntersection(DungeonRoom room, Vector3 insidePoint, Vector3 outsidePoint)
+        private void EnsureFullConnectivity(ref int corridorIndex)
         {
-            Vector3 direction = (outsidePoint - insidePoint).normalized;
-            Vector3 currentPoint = insidePoint;
+            if (rooms.Count < 2) return;
 
-            // Step along the line until we hit the room boundary
-            float step = 0.1f;
-            float maxDistance = Vector3.Distance(insidePoint, outsidePoint);
+            // BFS from first room
+            HashSet<int> visited = new HashSet<int>();
+            Queue<DungeonRoom> queue = new Queue<DungeonRoom>();
+            visited.Add(rooms[0].Id);
+            queue.Enqueue(rooms[0]);
 
-            for (float dist = 0; dist < maxDistance; dist += step)
+            while (queue.Count > 0)
             {
-                currentPoint = insidePoint + direction * dist;
-
-                // Check if current point is outside the room bounds
-                if (!IsPointInRoom(room, currentPoint))
+                var current = queue.Dequeue();
+                foreach (int connectedId in current.ConnectedRoomIds)
                 {
-                    // Step back slightly to get the boundary point
-                    return insidePoint + direction * (dist - step);
-                }
-            }
-
-            // Fallback: return the outside point
-            return outsidePoint;
-        }
-
-        /// <summary>
-        /// Check if a point is inside a room's bounds
-        /// </summary>
-        private bool IsPointInRoom(DungeonRoom room, Vector3 point)
-        {
-            return point.x >= room.Position.x &&
-                   point.x <= room.Position.x + room.Size.x &&
-                   point.z >= room.Position.z &&
-                   point.z <= room.Position.z + room.Size.z;
-        }
-
-        /// <summary>
-        /// Create a corridor segment between two points, detecting and creating crossroads if needed
-        /// </summary>
-        private void CreateCorridor(Vector3 start, Vector3 end, int corridorIndex, string direction)
-        {
-            // Check for intersections with existing corridors
-            Vector3? intersectionPoint = FindCorridorIntersection(start, end);
-
-            if (intersectionPoint.HasValue)
-            {
-                Vector3 crossroad = intersectionPoint.Value;
-
-                // Check if we already have a crossroad at this position
-                bool crossroadExists = false;
-                foreach (var existingCrossroad in crossroadPositions)
-                {
-                    if (Vector3.Distance(existingCrossroad, crossroad) < corridorWidth * 0.5f)
+                    if (!visited.Contains(connectedId))
                     {
-                        crossroadExists = true;
-                        crossroad = existingCrossroad; // Use existing position
-                        break;
-                    }
-                }
-
-                // Create corridor segments from start to crossroad and crossroad to end
-                if (Vector3.Distance(start, crossroad) > 0.5f)
-                {
-                    corridorGenerator.CreateCorridor(start, crossroad, dungeonParent.transform, corridorIndex, direction + "_ToCrossroad");
-                    corridorSegments.Add(new CorridorSegment(start, crossroad));
-                }
-
-                if (Vector3.Distance(crossroad, end) > 0.5f)
-                {
-                    corridorGenerator.CreateCorridor(crossroad, end, dungeonParent.transform, corridorIndex, direction + "_FromCrossroad");
-                    corridorSegments.Add(new CorridorSegment(crossroad, end));
-                }
-
-                // Create crossroad piece if it doesn't exist yet
-                if (!crossroadExists)
-                {
-                    CreateCrossroad(crossroad, corridorIndex);
-                    crossroadPositions.Add(crossroad);
-                }
-            }
-            else
-            {
-                // No intersection, create normal corridor
-                corridorGenerator.CreateCorridor(start, end, dungeonParent.transform, corridorIndex, direction);
-                corridorSegments.Add(new CorridorSegment(start, end));
-            }
-        }
-
-        /// <summary>
-        /// Find intersection point between a new corridor and existing corridors
-        /// </summary>
-        private Vector3? FindCorridorIntersection(Vector3 start, Vector3 end)
-        {
-            CorridorSegment newSegment = new CorridorSegment(start, end);
-            float halfWidth = corridorWidth / 2f;
-
-            foreach (var existing in corridorSegments)
-            {
-                // Check if corridors are perpendicular (one horizontal X, one horizontal Z)
-                if (newSegment.IsHorizontalX && existing.IsHorizontalZ)
-                {
-                    // New corridor runs along X, existing runs along Z
-                    float intersectX = existing.Start.x;
-                    float intersectZ = newSegment.Start.z;
-                    float intersectY = Mathf.Max(newSegment.Start.y, existing.Start.y); // Use higher Y
-
-                    // Check if intersection point is within both corridor bounds
-                    if (IsPointOnSegment(new Vector3(intersectX, intersectY, intersectZ), newSegment, halfWidth) &&
-                        IsPointOnSegment(new Vector3(intersectX, intersectY, intersectZ), existing, halfWidth))
-                    {
-                        return new Vector3(intersectX, intersectY, intersectZ);
-                    }
-                }
-                else if (newSegment.IsHorizontalZ && existing.IsHorizontalX)
-                {
-                    // New corridor runs along Z, existing runs along X
-                    float intersectX = newSegment.Start.x;
-                    float intersectZ = existing.Start.z;
-                    float intersectY = Mathf.Max(newSegment.Start.y, existing.Start.y);
-
-                    if (IsPointOnSegment(new Vector3(intersectX, intersectY, intersectZ), newSegment, halfWidth) &&
-                        IsPointOnSegment(new Vector3(intersectX, intersectY, intersectZ), existing, halfWidth))
-                    {
-                        return new Vector3(intersectX, intersectY, intersectZ);
+                        visited.Add(connectedId);
+                        var connectedRoom = rooms.Find(r => r.Id == connectedId);
+                        if (connectedRoom != null)
+                            queue.Enqueue(connectedRoom);
                     }
                 }
             }
 
-            return null;
-        }
-
-        /// <summary>
-        /// Check if a point lies on a corridor segment (with tolerance)
-        /// </summary>
-        private bool IsPointOnSegment(Vector3 point, CorridorSegment segment, float tolerance)
-        {
-            Vector3 min = Vector3.Min(segment.Start, segment.End);
-            Vector3 max = Vector3.Max(segment.Start, segment.End);
-
-            return point.x >= min.x - tolerance && point.x <= max.x + tolerance &&
-                   point.z >= min.z - tolerance && point.z <= max.z + tolerance &&
-                   Mathf.Abs(point.y - segment.Start.y) < 0.1f; // Same floor level
-        }
-
-        /// <summary>
-        /// Create a crossroad piece where corridors intersect
-        /// </summary>
-        private void CreateCrossroad(Vector3 position, int corridorIndex)
-        {
-            // Create a larger square piece for the crossroad
-            GameObject crossroadObj = new GameObject($"Crossroad_{corridorIndex}");
-            crossroadObj.transform.SetParent(dungeonParent.transform);
-            crossroadObj.transform.position = position;
-
-            float crossroadSize = corridorWidth * 1.5f; // Make crossroad slightly larger
-            float halfSize = crossroadSize / 2f;
-
-            // Create floor for crossroad using ProBuilder cube
-            ProBuilderMesh floorMesh = ShapeGenerator.GenerateCube(
-                PivotLocation.Center,
-                new Vector3(crossroadSize, 0.1f, crossroadSize)
-            );
-
-            GameObject floorObj = floorMesh.gameObject;
-            floorObj.name = "CrossroadFloor";
-            floorObj.transform.SetParent(crossroadObj.transform);
-            floorObj.transform.localPosition = new Vector3(0, 0.05f, 0);
-
-            // Apply material
-            var renderer = floorMesh.GetComponent<MeshRenderer>();
-            if (renderer != null && corridorMaterial != null)
+            // Find unreachable rooms and force-connect them
+            List<DungeonRoom> unreachable = rooms.FindAll(r => !visited.Contains(r.Id));
+            while (unreachable.Count > 0)
             {
-                renderer.sharedMaterial = corridorMaterial;
+                // Find closest (reachable, unreachable) pair
+                float bestDist = float.MaxValue;
+                DungeonRoom bestReachable = null;
+                DungeonRoom bestUnreachable = null;
+
+                foreach (var ur in unreachable)
+                {
+                    foreach (var vr in rooms)
+                    {
+                        if (!visited.Contains(vr.Id)) continue;
+                        float dist = Vector3.Distance(ur.GetCenter(), vr.GetCenter());
+                        if (dist < bestDist)
+                        {
+                            bestDist = dist;
+                            bestReachable = vr;
+                            bestUnreachable = ur;
+                        }
+                    }
+                }
+
+                if (bestReachable == null || bestUnreachable == null) break;
+
+                // Force-connect (mandatory)
+                ConnectRooms(bestUnreachable, bestReachable, corridorIndex++, true);
+
+                // BFS again from the newly connected room
+                visited.Add(bestUnreachable.Id);
+                queue.Enqueue(bestUnreachable);
+                while (queue.Count > 0)
+                {
+                    var current = queue.Dequeue();
+                    foreach (int connectedId in current.ConnectedRoomIds)
+                    {
+                        if (!visited.Contains(connectedId))
+                        {
+                            visited.Add(connectedId);
+                            var connectedRoom = rooms.Find(r => r.Id == connectedId);
+                            if (connectedRoom != null)
+                                queue.Enqueue(connectedRoom);
+                        }
+                    }
+                }
+
+                unreachable = rooms.FindAll(r => !visited.Contains(r.Id));
             }
-
-            floorMesh.ToMesh();
-            floorMesh.Refresh();
-
-            Debug.Log($"Created crossroad at {position}");
         }
 
         /// <summary>
-        /// Create a corner piece at corridor junction
+        /// Add extra connections between nearby rooms to create loops (maze effect).
+        /// Iterates room pairs by distance, connecting with extraConnectionChance probability.
         /// </summary>
-        private void CreateCorridorCorner(Vector3 cornerPosition, int corridorIndex)
+        private void AddExtraConnections(ref int corridorIndex)
         {
-            corridorGenerator.CreateCorridorCorner(cornerPosition, dungeonParent.transform, corridorIndex);
+            if (extraConnectionChance <= 0f || rooms.Count < 3) return;
+
+            // Build list of all room pairs sorted by distance (closest first)
+            List<(DungeonRoom a, DungeonRoom b, float dist)> pairs = new List<(DungeonRoom, DungeonRoom, float)>();
+            for (int i = 0; i < rooms.Count; i++)
+            {
+                for (int j = i + 1; j < rooms.Count; j++)
+                {
+                    float dist = Vector3.Distance(rooms[i].GetCenter(), rooms[j].GetCenter());
+                    pairs.Add((rooms[i], rooms[j], dist));
+                }
+            }
+            pairs.Sort((a, b) => a.dist.CompareTo(b.dist));
+
+            int extraCount = 0;
+            foreach (var (roomA, roomB, dist) in pairs)
+            {
+                // Skip already connected pairs
+                if (roomA.ConnectedRoomIds.Contains(roomB.Id)) continue;
+
+                // Both rooms must have available walls
+                if (!CanAddCorridor(roomA) || !CanAddCorridor(roomB)) continue;
+
+                // Random chance gate
+                if (random.NextDouble() > extraConnectionChance) continue;
+
+                ConnectRooms(roomA, roomB, corridorIndex++, false);
+                extraCount++;
+            }
         }
 
         /// <summary>
@@ -717,17 +675,22 @@ namespace RpgTalentTree.Core.Dungeon
                 EmitWallMarkers(room);
             }
 
-            // Corridor intersection markers
-            foreach (var crossroadPos in crossroadPositions)
+            // Corridor markers from generated paths
+            if (corridorGenerator != null)
             {
-                dungeonMarkers.Add(DungeonMarker.CreateSimple(MarkerType.CorridorIntersection, crossroadPos));
-            }
+                foreach (var path in corridorGenerator.GetCorridorPaths())
+                {
+                    for (int i = 0; i < path.Points.Count - 1; i++)
+                    {
+                        Vector3 midPoint = (path.Points[i] + path.Points[i + 1]) / 2f;
+                        dungeonMarkers.Add(DungeonMarker.CreateSimple(MarkerType.CorridorFloor, midPoint));
+                    }
+                }
 
-            // Corridor floor markers (along corridor segments)
-            foreach (var segment in corridorSegments)
-            {
-                Vector3 midPoint = (segment.Start + segment.End) / 2f;
-                dungeonMarkers.Add(DungeonMarker.CreateSimple(MarkerType.CorridorFloor, midPoint));
+                foreach (var junction in corridorGenerator.GetJunctionPoints())
+                {
+                    dungeonMarkers.Add(DungeonMarker.CreateSimple(MarkerType.CorridorIntersection, junction));
+                }
             }
 
             Debug.Log($"Generated {dungeonMarkers.Count} markers for decoration");
