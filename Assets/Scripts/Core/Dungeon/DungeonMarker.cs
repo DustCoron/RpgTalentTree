@@ -31,7 +31,8 @@ namespace RpgTalentTree.Core.Dungeon
         StairMid,             // Middle of staircase (for lighting)
 
         // Special markers
-        SpawnPoint,           // Potential player/enemy spawn
+        SpawnPoint,           // Dungeon entrance / player spawn
+        ExitPoint,            // Dungeon exit / goal
         TreasureSpot,         // Potential treasure location
         LightPoint            // Suggested light placement
     }

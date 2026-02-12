@@ -16,15 +16,15 @@ MonoBehaviour:
   caption: 
   bounds:
     serializedVersion: 2
-    x: 0
+    x: 0.97605187
     y: 0
-    width: 120
-    height: 120
+    width: 100.15
+    height: 58.64
   canBeDeleted: 0
   canBeSelected: 1
   canBeMoved: 1
   selected: 0
-  zIndex: 0
+  zIndex: 1
   inputPins:
   - {fileID: -7787693115438241310}
   outputPins:
@@ -45,13 +45,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   pinType: 0
   node: {fileID: -8845660358422958189}
-  position: {x: 0, y: 0}
+  position: {x: 50.075, y: 29.32}
   boundsOffset:
     serializedVersion: 2
-    x: 0
-    y: 0
-    width: 0
-    height: 0
+    x: -50.075
+    y: -29.32
+    width: 100.15
+    height: 58.64
   tangent: {x: 0, y: -1}
   tangentStrength: 50
   Padding: {x: 10, y: 10}
@@ -70,7 +70,7 @@ MonoBehaviour:
   indexCounter:
     index: 0
   topZIndex:
-    index: 0
+    index: 1
   nodes:
   - {fileID: -8845660358422958189}
   links: []
@@ -89,16 +89,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   pinType: 1
   node: {fileID: -8845660358422958189}
-  position: {x: 0, y: 0}
+  position: {x: 50.075, y: 29.32}
   boundsOffset:
     serializedVersion: 2
-    x: 0
-    y: 0
-    width: 0
-    height: 0
+    x: -50.075
+    y: -29.32
+    width: 100.15
+    height: 58.64
   tangent: {x: 0, y: -1}
   tangentStrength: 50
-  Padding: {x: 10, y: 10}
+  Padding: {x: 12, y: 12}
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0

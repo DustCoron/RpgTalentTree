@@ -35,6 +35,16 @@ namespace RpgTalentTree.Core.Dungeon
     }
 
     /// <summary>
+    /// Room scale category - controls size range during generation
+    /// </summary>
+    public enum RoomScale
+    {
+        Small,
+        Medium,
+        Large
+    }
+
+    /// <summary>
     /// Represents a single room in the dungeon
     /// Enhanced with CodeRespawn patterns: unique ID, connectivity, room types
     /// </summary>
@@ -52,6 +62,7 @@ namespace RpgTalentTree.Core.Dungeon
         // Room connectivity (CodeRespawn pattern)
         public List<int> ConnectedRoomIds { get; private set; } = new List<int>();
         public RoomType Type { get; set; } = RoomType.Normal;
+        public RoomScale Scale { get; set; } = RoomScale.Medium;
 
         // Track which walls have doorways (one corridor per wall)
         private HashSet<Doorway.WallSide> usedWalls = new HashSet<Doorway.WallSide>();
@@ -96,6 +107,11 @@ namespace RpgTalentTree.Core.Dungeon
             if (!other.ConnectedRoomIds.Contains(Id))
                 other.ConnectedRoomIds.Add(Id);
         }
+
+        /// <summary>
+        /// Check if this room is already connected to another room
+        /// </summary>
+        public bool IsConnectedTo(DungeonRoom other) => ConnectedRoomIds.Contains(other.Id);
 
         public static void ResetIdCounter() => nextId = 0;
 
